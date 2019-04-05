@@ -24,6 +24,7 @@ public:
 	Graph cadence() const;
 	Graph power() const;
 	Graph ratio() const;
+	Graph evScalar(EVData::scalar_t id) const;
 
 	qreal distance() const;
 	qreal time() const;

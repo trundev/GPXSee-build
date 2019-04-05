@@ -375,6 +375,29 @@ Graph Track::power() const
 	return ret;
 }
 
+Graph Track::evScalar(EVData::scalar_t id) const
+{
+	Graph ret;
+
+	for (int i = 0; i < _data.size(); i++) {
+		const SegmentData &sd = _data.at(i);
+		if (sd.size() < 2)
+			continue;
+		const Segment &seg = _segments.at(i);
+		GraphSegment gs;
+
+		for (int j = 0; j < sd.count(); j++) {
+			qreal val = sd.at(j).evData().scalar(id);
+			if (val != NAN)
+				gs.append(GraphPoint(seg.distance.at(j), seg.time.at(j), val));
+		}
+
+		ret.append(gs);
+	}
+
+	return ret;
+}
+
 qreal Track::distance() const
 {
 	for (int i = _segments.size() - 1; i >= 0; i--) {

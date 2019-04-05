@@ -1,15 +1,15 @@
 #include <QImageReader>
 #include "csvparser.h"
+#include "common/evdata.h"
 #include "GUI/icons.h"
 
-// Wheel log columns
+// Wheellog CSV column headers
 #define ENUM_WHEELLOG_COLUMNS(F)	\
 	/* Android's GPS data */ \
 	F(date) F(time) F(latitude) F(longitude) F(gps_speed) F(gps_alt) F(gps_heading) F(gps_distance) \
 	/* Electric Vehicle data */ \
-	F(speed) F(voltage) F(current) F(power) F(battery_level) F(distance) F(totaldistance) \
-	F(system_temp) F(cpu_temp) F(tilt) F(roll) \
-	F(mode) F(alert) \
+	ENUM_EVDATA_SCALARS(F) \
+	F(mode) F(alert)
 
 bool CSVParser::parse_waypoints(QFile *file, QList<TrackData> &tracks,
   QList<RouteData> &routes, QList<Area> &polygons,
@@ -166,10 +166,10 @@ bool CSVParser::parse_wheellog(QFile *file, QList<TrackData> &tracks,
 			list.removeLast();
 		}
 
-		QString mode, alert;
 		Coordinates coords;
 		QDateTime time_stamp;
 		Trackpoint trackpoint;
+		EVData evdata;
 
 		for (int idx = 0; idx < sizeof(WlColumns) / sizeof(*WlColumns); idx++) {
 			QString str_val = get_column_str(list, static_cast<WlColumn_t>(idx));
@@ -200,34 +200,43 @@ bool CSVParser::parse_wheellog(QFile *file, QList<TrackData> &tracks,
 			case wl_time_idx:			time_stamp.setTime(QTime::fromString(str_val)); break;
 			case wl_latitude_idx:		coords.setLat(float_val); break;
 			case wl_longitude_idx:		coords.setLon(float_val); break;
-			case wl_gps_speed_idx:		/*trackpoint.setSpeed(float_val / 3.6);*/ break;	// km/h -> m/s
+			case wl_gps_speed_idx:		trackpoint.setSpeed(float_val / 3.6); break;	// km/h -> m/s
 			case wl_gps_alt_idx:		trackpoint.setElevation(float_val); break;
 			case wl_gps_heading_idx:	break;
 			case wl_gps_distance_idx:	break;
 			/* Electric Vehicle data */
-			case wl_speed_idx:			trackpoint.setSpeed(float_val / 3.6); break;	// km/h -> m/s
-			case wl_voltage_idx:		break;
-			case wl_current_idx:		break;
-			case wl_power_idx:			trackpoint.setPower(float_val); break;
-			case wl_battery_level_idx:	break;
-			case wl_distance_idx:		break;
-			case wl_totaldistance_idx:	break;
-			case wl_system_temp_idx:	trackpoint.setTemperature(float_val); break;
-			case wl_cpu_temp_idx:		break;
-			case wl_tilt_idx:			break;
-			case wl_roll_idx:			break;
-			case wl_mode_idx:			mode = str_val; break;
-			case wl_alert_idx:			alert = str_val; break;
+			case wl_speed_idx:			evdata.setScalar(EVData::t_speed, float_val / 3.6); break;	// km/h -> m/s
+			case wl_voltage_idx:		evdata.setScalar(EVData::t_voltage, float_val); break;
+			case wl_current_idx:		evdata.setScalar(EVData::t_current, float_val); break;
+			case wl_power_idx:			evdata.setScalar(EVData::t_power, float_val); break;
+			case wl_battery_level_idx:	evdata.setScalar(EVData::t_battery_level, float_val); break;
+			case wl_distance_idx:		evdata.setScalar(EVData::t_distance, float_val); break;
+			case wl_totaldistance_idx:	evdata.setScalar(EVData::t_totaldistance, float_val); break;
+			case wl_system_temp_idx:	evdata.setScalar(EVData::t_system_temp, float_val); break;
+			case wl_cpu_temp_idx:		evdata.setScalar(EVData::t_cpu_temp, float_val); break;
+			case wl_tilt_idx:			evdata.setScalar(EVData::t_tilt, float_val); break;
+			case wl_roll_idx:			evdata.setScalar(EVData::t_roll, float_val); break;
+			case wl_mode_idx:			evdata.setMode(str_val); break;
+			case wl_alert_idx:			evdata.setAlert(str_val); break;
 			}
 		}
 
+		trackpoint.setTimestamp(time_stamp);
+		trackpoint.setCoordinates(coords);
+		trackpoint.setEVData(evdata);
+
+#if 1	//HACK: Temporary keep existing behvor
+		trackpoint.setSpeed(evdata.scalar(EVData::t_speed));
+		trackpoint.setPower(evdata.scalar(EVData::t_power));
+		trackpoint.setTemperature(evdata.scalar(EVData::t_system_temp));
+#endif
+
+		// Skip non-geolocated points (concider changing this)
 		if (coords.isValid()) {
 			// Avoid problems with unordered time-stamps by ignoring them
 			// TODO: Must sort the log
 			if (last_time_stamp < time_stamp) {
 				last_time_stamp = time_stamp;
-				trackpoint.setTimestamp(time_stamp);
-				trackpoint.setCoordinates(coords);
 				track.last().append(trackpoint);
 			}
 			else {
@@ -235,24 +244,24 @@ bool CSVParser::parse_wheellog(QFile *file, QList<TrackData> &tracks,
 			}
 
 			// Add waypoint on alert or mode change
-			if (!alert.isEmpty() || last_mode != mode) {
+			if (evdata.hasAlert() || last_mode != evdata.mode()) {
 				Waypoint waypoint(coords);
 				waypoint.setTimestamp(time_stamp);
 				waypoint.setElevation(trackpoint.elevation());
-				waypoint.setName(alert.isEmpty() ? mode : "ALERT");
+				waypoint.setName(evdata.hasAlert() ? "ALERT" : evdata.mode());
 				QString descr;
-				QTextStream(&descr) << "Line " << _errorLine << ": " << alert;
+				QTextStream(&descr) << "Line " << _errorLine << ": " << evdata.alert();
 				waypoint.setDescription(descr);
 #if 1	//Experimental: Add icons
 				static ImageInfo poiIcon(SHOW_POI_ICON, QImageReader(SHOW_POI_ICON).size());
 				static ImageInfo alertIcon(CLOSE_FILE_ICON, QImageReader(CLOSE_FILE_ICON).size());
-				waypoint.setImage(alert.isEmpty() ?  poiIcon : alertIcon);
+				waypoint.setImage(evdata.hasAlert() ?  alertIcon : poiIcon);
 #endif
 				waypoints.append(waypoint);
 			}
 
 			// Keep the last mode
-			last_mode = mode;
+			last_mode = evdata.mode();
 		}
 
 		_errorLine++;
