@@ -53,6 +53,8 @@ HEADERS += src/common/config.h \
     src/GUI/fileselectwidget.h \
     src/GUI/margins.h \
     src/GUI/temperaturegraph.h \
+    src/GUI/evgraph.h \
+    src/GUI/evgraphitem.h \
     src/GUI/graphtab.h \
     src/GUI/trackitem.h \
     src/GUI/tooltip.h \
@@ -166,6 +168,7 @@ HEADERS += src/common/config.h \
     src/data/imageinfo.h
 SOURCES += src/main.cpp \
     src/common/coordinates.cpp \
+    src/common/evdata.h \
     src/common/rectc.cpp \
     src/common/range.cpp \
     src/common/util.cpp \
@@ -191,6 +194,8 @@ SOURCES += src/main.cpp \
     src/GUI/exportdialog.cpp \
     src/GUI/fileselectwidget.cpp \
     src/GUI/temperaturegraph.cpp \
+    src/GUI/evgraph.cpp \
+    src/GUI/evgraphitem.cpp \
     src/GUI/trackitem.cpp \
     src/GUI/tooltip.cpp \
     src/GUI/routeitem.cpp \

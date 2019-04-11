@@ -176,4 +176,7 @@
 #define HIDPI_MAP_SETTING                 "HiDPIMap"
 #define HIDPI_MAP_DEFAULT                 true
 
+#define EVDATA_SETTINGS_GROUP             "EVData"
+#define EVDATA_SHOW_PREFIX_SETTINGS       "show_"
+
 #endif // SETTINGS_H

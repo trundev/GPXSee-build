@@ -205,7 +205,7 @@ bool CSVParser::parse_wheellog(QFile *file, QList<TrackData> &tracks,
 			case wl_gps_heading_idx:	break;
 			case wl_gps_distance_idx:	break;
 			/* Electric Vehicle data */
-			case wl_speed_idx:			evdata.setScalar(EVData::t_speed, float_val / 3.6); break;	// km/h -> m/s
+			case wl_speed_idx:			evdata.setScalar(EVData::t_speed, float_val); break;
 			case wl_voltage_idx:		evdata.setScalar(EVData::t_voltage, float_val); break;
 			case wl_current_idx:		evdata.setScalar(EVData::t_current, float_val); break;
 			case wl_power_idx:			evdata.setScalar(EVData::t_power, float_val); break;
@@ -224,12 +224,6 @@ bool CSVParser::parse_wheellog(QFile *file, QList<TrackData> &tracks,
 		trackpoint.setTimestamp(time_stamp);
 		trackpoint.setCoordinates(coords);
 		trackpoint.setEVData(evdata);
-
-#if 1	//HACK: Temporary keep existing behvor
-		trackpoint.setSpeed(evdata.scalar(EVData::t_speed));
-		trackpoint.setPower(evdata.scalar(EVData::t_power));
-		trackpoint.setTemperature(evdata.scalar(EVData::t_system_temp));
-#endif
 
 		// Skip non-geolocated points (concider changing this)
 		if (coords.isValid()) {
