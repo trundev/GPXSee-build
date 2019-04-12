@@ -105,6 +105,7 @@ QList<GraphItem*> EVGraph::loadData(const Data &data)
 	for (int i = 0; i < data.tracks().count(); i++) {
 		const Track &track = data.tracks().at(i);
 
+		bool hasGraph = false;
 		for (int id = 0; id < EVData::t_scalar_num; id++) {
 			EVData::scalar_t scalarId = (EVData::scalar_t)id;
 
@@ -115,6 +116,7 @@ QList<GraphItem*> EVGraph::loadData(const Data &data)
 
 				GraphTab::addGraph(gi, id);
 				graphs.append(gi);
+				hasGraph = true;
 
 #ifndef QT_NO_CONTEXTMENU
 				QAction *a = findAction(_evShowActions, id);
@@ -125,12 +127,20 @@ QList<GraphItem*> EVGraph::loadData(const Data &data)
 #endif // QT_NO_CONTEXTMENU
 			}
 		}
+
+		if (!hasGraph) {
+			skipColor();
+			graphs.append(0);
+		}
 	}
 
-	if (graphs.size() == 0) {
+	for (int i = 0; i < data.routes().count(); i++) {
 		skipColor();
 		graphs.append(0);
 	}
+
+	for (int i = 0; i < data.areas().count(); i++)
+		skipColor();
 
 	setInfo();
 	redraw();
