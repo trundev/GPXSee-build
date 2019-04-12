@@ -1,4 +1,5 @@
 #include <QImageReader>
+#include <QFileInfo>
 #include "csvparser.h"
 #include "common/evdata.h"
 #include "GUI/icons.h"
@@ -10,6 +11,9 @@
 	/* Electric Vehicle data */ \
 	ENUM_EVDATA_SCALARS(F) \
 	F(mode) F(alert)
+
+#define DRIVE_MODE	"Drive"
+#define MIN_SEGMENT_SIZE	100
 
 bool CSVParser::parse_waypoints(QFile *file, QList<TrackData> &tracks,
   QList<RouteData> &routes, QList<Area> &polygons,
@@ -138,8 +142,12 @@ bool CSVParser::parse_wheellog(QFile *file, QList<TrackData> &tracks,
 	_errorLine++;
 
 	tracks.append(TrackData());
-	TrackData &track = tracks.back();
-	track.append(SegmentData());
+	tracks.last().append(SegmentData());
+
+	// Keep the file-name and the full-path name
+	QString fileName(QFileInfo(*file).fileName());
+	tracks.last().setName(fileName);
+	tracks.last().setDescription(file->fileName());
 
 	QString last_mode;
 	QDateTime last_time_stamp;
@@ -231,7 +239,13 @@ bool CSVParser::parse_wheellog(QFile *file, QList<TrackData> &tracks,
 			// TODO: Must sort the log
 			if (last_time_stamp < time_stamp) {
 				last_time_stamp = time_stamp;
-				track.last().append(trackpoint);
+
+#if 1 // New segment on Drive-mode start
+				if (last_mode != evdata.mode() && evdata.mode() == DRIVE_MODE && tracks.last().last().size() > MIN_SEGMENT_SIZE) {
+					tracks.last().append(SegmentData());
+				}
+#endif
+				tracks.last().last().append(trackpoint);
 			}
 			else {
 				qDebug() << "Warning: Ignored unordered time-stamp" << time_stamp.toString() << ", at line" << _errorLine;
