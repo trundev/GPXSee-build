@@ -171,9 +171,43 @@ void EVGraph::showTracks(bool show)
 #ifndef QT_NO_CONTEXTMENU
 void EVGraph::contextMenuEvent(QContextMenuEvent *event)
 {
-	qDebug() << __FUNCTION__ << ": " << event;
+	const QList<QGraphicsItem *> &view_items = items(event->pos());
 
-	_contextMenu.exec(event->globalPos());
+	// Find the the uppermost GraphItem --
+	// the smallest index returned by QGraphicsView::items()
+	const GraphItem *gi = NULL;
+	for (int idx = 0; idx < view_items.size(); idx++) {
+		QGraphicsObject *go = view_items[idx]->toGraphicsObject();
+		if (go) {
+			int i = _graphs.indexOf((GraphItem*)go);
+			if (i >= 0) {
+				gi = _graphs[i];
+				break;
+			}
+		}
+	}
+
+	if (gi) {
+		// Clicked on an EV graph, show modified menu
+		EVData::scalar_t scalarId = (EVData::scalar_t)gi->id();
+
+		QAction *a = new QAction(tr("Show only ") + tr(EVData::getUserName(scalarId)), this);
+		a->setMenuRole(QAction::NoRole);
+		a->setData(scalarId);
+		connect(a, SIGNAL(triggered()), this,
+		  SLOT(showSingleEVData()));
+
+		QMenu menu;
+		menu.addAction(a);
+		menu.addSeparator();
+		for (int idx = 0; idx < _evShowActions.size(); idx++)
+			menu.addAction(_evShowActions[idx]);
+
+		menu.exec(event->globalPos());
+		delete a;
+	}
+	else
+		_contextMenu.exec(event->globalPos());
 }
 #endif // QT_NO_CONTEXTMENU
 
@@ -184,5 +218,24 @@ void EVGraph::showEVData(bool show)
 		return;
 
 	showGraph(show, act->data().toInt());
+	redraw();
+}
+
+void EVGraph::showSingleEVData()
+{
+	QAction* act = qobject_cast<QAction *>(sender());
+	if (act == NULL)
+		return;
+
+	int id = act->data().toInt();
+	for (int idx = 0; idx < EVData::t_scalar_num; idx++)
+		if (idx != id) {
+			QAction *a = findAction(_evShowActions, idx);
+			if (a) {
+				a->setChecked(false);
+				showGraph(false, idx);
+			}
+		}
+
 	redraw();
 }

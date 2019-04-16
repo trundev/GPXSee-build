@@ -20,6 +20,7 @@ public:
 
 public slots:
 	void showEVData(bool show);
+	void showSingleEVData();
 
 private:
 #ifndef QT_NO_CONTEXTMENU
