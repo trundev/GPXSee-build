@@ -91,10 +91,12 @@ private:
 
 	void resizeEvent(QResizeEvent *e);
 	void mousePressEvent(QMouseEvent *e);
+	void wheelEvent(QWheelEvent *e);
 
 	Units _units;
 	qreal _xScale, _yScale;
 	qreal _yOffset;
+	qreal _xZoom;
 	QString _xUnits, _yUnits;
 	QString _xLabel, _yLabel;
 	int _precision;

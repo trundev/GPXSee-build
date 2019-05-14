@@ -6,6 +6,7 @@
 #include <QGraphicsSimpleTextItem>
 #include <QPalette>
 #include <QLocale>
+#include <QScrollBar>
 #include "data/graph.h"
 #include "opengl.h"
 #include "axisitem.h"
@@ -30,7 +31,7 @@ GraphView::GraphView(QWidget *parent)
 	setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
 	setRenderHint(QPainter::Antialiasing, true);
 	setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 	setBackgroundBrush(QBrush(palette().brush(QPalette::Base)));
 
 	_xAxis = new AxisItem(AxisItem::X);
@@ -55,6 +56,7 @@ GraphView::GraphView(QWidget *parent)
 	_xScale = 1;
 	_yScale = 1;
 	_yOffset = 0;
+	_xZoom = 1;
 
 	_precision = 0;
 	_minYRange = 0.01;
@@ -314,6 +316,7 @@ void GraphView::redraw(const QSizeF &size)
 	sx = (size.width() - (my.width() + mx.width())) / r.width();
 	sy = (size.height() - (mx.height() + my.height())
 	  - _info->boundingRect().height()) / r.height();
+	sx *= _xZoom;
 
 	for (int i = 0; i < _visible.size(); i++)
 		_visible.at(i)->setScale(sx, sy);
@@ -359,6 +362,40 @@ void GraphView::mousePressEvent(QMouseEvent *e)
 		newSliderPosition(mapToScene(e->pos()));
 
 	QGraphicsView::mousePressEvent(e);
+}
+
+void GraphView::wheelEvent(QWheelEvent *e)
+{
+	qreal zoom = 0.;
+	if (e->angleDelta().y() > 0)
+		zoom = _xZoom * 1.25;
+	else if (e->angleDelta().y() < 0)
+		zoom = _xZoom / 1.25;
+
+	if (zoom > 0.) {
+		// Get the relative cursor position
+		// Do not use "(<pos> - <topLeft>) or <width>/<height>" as the drawings at
+		// negative positions, i.e. to the left of (0, 0) are not rescaled (not
+		// affected by _xZoom).
+		// Note that the <topLeft> is negative.
+		QPointF relativePos = mapToScene(e->pos())/* - sceneRect().topLeft()*/;
+		relativePos.setX(relativePos.x() / sceneRect().right()/*width()*/);
+		relativePos.setY(relativePos.y() / sceneRect().bottom()/*height()*/);
+
+		_xZoom = zoom;
+		redraw();
+
+		// Convert it to view-position after re-scaling
+		relativePos.setX(relativePos.x() * sceneRect().right()/*.width()*/);
+		relativePos.setY(relativePos.y() * sceneRect().bottom()/*.height()*/);
+		QPoint newPos = mapFromScene(relativePos/* + sceneRect().topLeft()*/);
+
+		// Scroll this position to the same view location
+		QScrollBar *scrollBar = horizontalScrollBar();
+		scrollBar->setSliderPosition(scrollBar->sliderPosition() + newPos.x() - e->pos().x());
+	}
+
+	QGraphicsView::wheelEvent(e);
 }
 
 void GraphView::plot(QPainter *painter, const QRectF &target, qreal scale)
