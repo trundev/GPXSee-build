@@ -1,8 +1,14 @@
 #include <QPainter>
+#include <QCursor>
 #include "griditem.h"
 
 
 #define GRID_WIDTH 0
+
+GridItem::GridItem(QGraphicsItem *parent) : QGraphicsItem(parent)
+{
+	setCursor(Qt::ArrowCursor);
+}
 
 void GridItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
   QWidget *widget)

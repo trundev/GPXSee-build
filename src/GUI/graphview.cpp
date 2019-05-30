@@ -30,6 +30,7 @@ GraphView::GraphView(QWidget *parent)
 
 	setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
 	setRenderHint(QPainter::Antialiasing, true);
+	setDragMode(QGraphicsView::ScrollHandDrag);
 	setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 	setBackgroundBrush(QBrush(palette().brush(QPalette::Base)));
