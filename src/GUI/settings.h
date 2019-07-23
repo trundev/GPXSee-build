@@ -32,6 +32,8 @@
 #define SHOW_GRAPH_SLIDER_INFO_DEFAULT    true
 #define SHOW_MARKERS_SETTING              "pathMarkers"
 #define SHOW_MARKERS_DEFAULT              true
+#define SHOW_TICKS_SETTING                "pathTicks"
+#define SHOW_TICKS_DEFAULT                false
 
 #define MAP_SETTINGS_GROUP                "Map"
 #define CURRENT_MAP_SETTING               "map"
@@ -171,8 +173,8 @@
 #define SEPARATE_GRAPH_PAGE_DEFAULT       false
 #define SLIDER_COLOR_SETTING              "sliderColor"
 #define SLIDER_COLOR_DEFAULT              QColor(Qt::red)
-#define ALWAYS_SHOW_MAP_SETTING           "alwaysShowMap"
-#define ALWAYS_SHOW_MAP_DEFAULT           true
+#define PROJECTION_SETTING                "projection"
+#define PROJECTION_DEFAULT                3857
 #define HIDPI_MAP_SETTING                 "HiDPIMap"
 #define HIDPI_MAP_DEFAULT                 true
 

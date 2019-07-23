@@ -104,7 +104,6 @@ GUI::GUI()
 	readSettings();
 
 	updateGraphTabs();
-	updateMapView();
 	updateStatusBarInfo();
 }
 
@@ -351,6 +350,11 @@ void GUI::createActions()
 	_showRouteWaypointsAction->setCheckable(true);
 	connect(_showRouteWaypointsAction, SIGNAL(triggered(bool)), _mapView,
 	  SLOT(showRouteWaypoints(bool)));
+	_showTicksAction = new QAction(tr("km/mi markers"), this);
+	_showTicksAction->setMenuRole(QAction::NoRole);
+	_showTicksAction->setCheckable(true);
+	connect(_showTicksAction, SIGNAL(triggered(bool)), _mapView,
+	  SLOT(showTicks(bool)));
 
 	// Graph actions
 	_showGraphsAction = new QAction(QIcon(SHOW_GRAPHS_ICON), tr("Show graphs"),
@@ -538,6 +542,7 @@ void GUI::createMenus()
 	QMenu *displayMenu = dataMenu->addMenu(tr("Display"));
 	displayMenu->addAction(_showWaypointLabelsAction);
 	displayMenu->addAction(_showRouteWaypointsAction);
+	displayMenu->addAction(_showTicksAction);
 	dataMenu->addSeparator();
 	dataMenu->addAction(_showTracksAction);
 	dataMenu->addAction(_showRoutesAction);
@@ -727,6 +732,8 @@ void GUI::paths()
 	  + QDir::cleanPath(ProgramPaths::csvDir(true)) + "</code></td></tr><tr><td>"
 	  + tr("DEM directory:") + "</td><td><code>"
 	  + QDir::cleanPath(ProgramPaths::demDir(true)) + "</code></td></tr><tr><td>"
+	  + tr("Styles directory:") + "</td><td><code>"
+	  + QDir::cleanPath(ProgramPaths::styleDir(true)) + "</code></td></tr><tr><td>"
 	  + tr("Tile cache directory:") + "</td><td><code>"
 	  + QDir::cleanPath(ProgramPaths::tilesDir()) + "</code></td></tr></table>"
 	);
@@ -807,7 +814,7 @@ bool GUI::loadFile(const QString &fileName)
 
 		for (int i = 0; i < _tabs.count(); i++)
 			graphs.append(_tabs.at(i)->loadData(data));
-		if (updateGraphTabs() | updateMapView())
+		if (updateGraphTabs())
 			_splitter->refresh();
 		paths = _mapView->loadData(data);
 
@@ -830,7 +837,6 @@ bool GUI::loadFile(const QString &fileName)
 		updateStatusBarInfo();
 		updateWindowTitle();
 		updateGraphTabs();
-		updateMapView();
 
 		QString error = tr("Error loading data file:") + "\n\n"
 		  + fileName + "\n\n" + data.errorString();
@@ -881,8 +887,7 @@ void GUI::closePOIFiles()
 {
 	_poiFilesMenu->clear();
 
-	for (int i = 0; i < _poiFilesActions.count(); i++)
-		delete _poiFilesActions[i];
+	qDeleteAll(_poiFilesActions);
 	_poiFilesActions.clear();
 
 	_poi->clear();
@@ -932,6 +937,7 @@ void GUI::openOptions()
 	SET_VIEW_OPTION(pathAntiAliasing, useAntiAliasing);
 	SET_VIEW_OPTION(useOpenGL, useOpenGL);
 	SET_VIEW_OPTION(sliderColor, setMarkerColor);
+	SET_VIEW_OPTION(projection, setProjection);
 
 	SET_TAB_OPTION(palette, setPalette);
 	SET_TAB_OPTION(graphWidth, setGraphWidth);
@@ -976,8 +982,6 @@ void GUI::openOptions()
 		reloadFile();
 
 	_options = options;
-
-	updateMapView();
 }
 
 void GUI::printFile()
@@ -1232,7 +1236,6 @@ void GUI::closeAll()
 	updateStatusBarInfo();
 	updateWindowTitle();
 	updateGraphTabs();
-	updateMapView();
 }
 
 void GUI::showGraphs(bool show)
@@ -1473,19 +1476,6 @@ bool GUI::updateGraphTabs()
 	}
 
 	return (hidden != _graphTabWidget->isHidden());
-}
-
-bool GUI::updateMapView()
-{
-	bool hidden = _mapView->isHidden();
-
-	if (_options.alwaysShowMap)
-		_mapView->setHidden(false);
-	else
-		_mapView->setHidden(!(_trackCount + _routeCount + _waypointCount
-		  + _areaCount));
-
-	return (hidden != _mapView->isHidden());
 }
 
 void GUI::setTimeType(TimeType type)
@@ -1738,6 +1728,9 @@ void GUI::writeSettings()
 	if (_showRouteWaypointsAction->isChecked() != SHOW_ROUTE_WAYPOINTS_DEFAULT)
 		settings.setValue(SHOW_ROUTE_WAYPOINTS_SETTING,
 		  _showRouteWaypointsAction->isChecked());
+	if (_showTicksAction->isChecked() != SHOW_TICKS_DEFAULT)
+		settings.setValue(SHOW_TICKS_SETTING,
+		  _showTicksAction->isChecked());
 	settings.endGroup();
 
 	settings.beginGroup(EXPORT_SETTINGS_GROUP);
@@ -1849,8 +1842,8 @@ void GUI::writeSettings()
 		  _options.separateGraphPage);
 	if (_options.sliderColor != SLIDER_COLOR_DEFAULT)
 		settings.setValue(SLIDER_COLOR_SETTING, _options.sliderColor);
-	if (_options.alwaysShowMap != ALWAYS_SHOW_MAP_DEFAULT)
-		settings.setValue(ALWAYS_SHOW_MAP_SETTING, _options.alwaysShowMap);
+	if (_options.projection != PROJECTION_DEFAULT)
+		settings.setValue(PROJECTION_SETTING, _options.projection);
 #ifdef ENABLE_HIDPI
 	if (_options.hidpiMap != HIDPI_MAP_DEFAULT)
 		settings.setValue(HIDPI_MAP_SETTING, _options.hidpiMap);
@@ -2001,6 +1994,10 @@ void GUI::readSettings()
 		_mapView->showRouteWaypoints(false);
 	else
 		_showRouteWaypointsAction->setChecked(true);
+	if (settings.value(SHOW_TICKS_SETTING, SHOW_TICKS_DEFAULT).toBool()) {
+		_mapView->showTicks(true);
+		_showTicksAction->setChecked(true);
+	}
 	settings.endGroup();
 
 	settings.beginGroup(EXPORT_SETTINGS_GROUP);
@@ -2112,8 +2109,8 @@ void GUI::readSettings()
 	  SEPARATE_GRAPH_PAGE_DEFAULT).toBool();
 	_options.sliderColor = settings.value(SLIDER_COLOR_SETTING,
 	  SLIDER_COLOR_DEFAULT).value<QColor>();
-	_options.alwaysShowMap = settings.value(ALWAYS_SHOW_MAP_SETTING,
-	  ALWAYS_SHOW_MAP_DEFAULT).toBool();
+	_options.projection = settings.value(PROJECTION_SETTING, PROJECTION_DEFAULT)
+	  .toInt();
 #ifdef ENABLE_HIDPI
 	_options.hidpiMap = settings.value(HIDPI_MAP_SETTING, HIDPI_MAP_SETTING)
 	  .toBool();
@@ -2141,6 +2138,7 @@ void GUI::readSettings()
 	_mapView->setDevicePixelRatio(devicePixelRatioF(),
 	  _options.hidpiMap ? devicePixelRatioF() : 1.0);
 #endif // ENABLE_HIDPI
+	_mapView->setProjection(_options.projection);
 
 	for (int i = 0; i < _tabs.count(); i++) {
 		_tabs.at(i)->setPalette(_options.palette);
@@ -2219,6 +2217,8 @@ void GUI::show()
 	connect(w, SIGNAL(screenChanged(QScreen*)), this,
 	  SLOT(screenChanged(QScreen*)));
 #endif // ENABLE_HIDPI
+
+	_mapView->fitContentToSize();
 }
 
 void GUI::screenChanged(QScreen *screen)

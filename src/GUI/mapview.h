@@ -8,11 +8,13 @@
 #include "common/rectc.h"
 #include "common/config.h"
 #include "data/waypoint.h"
+#include "data/polygon.h"
+#include "map/projection.h"
 #include "searchpointer.h"
 #include "units.h"
 #include "format.h"
 #include "palette.h"
-#include "data/polygon.h"
+
 
 class Data;
 class POI;
@@ -77,9 +79,13 @@ public slots:
 	void showRouteWaypoints(bool show);
 	void showMarkers(bool show);
 	void showCoordinates(bool show);
+	void showTicks(bool show);
 	void clearMapCache();
 	void setCoordinatesFormat(CoordinatesFormat format);
 	void setDevicePixelRatio(qreal deviceRatio, qreal mapRatio);
+	void setProjection(int id);
+
+	void fitContentToSize();
 
 private slots:
 	void updatePOI();
@@ -107,7 +113,6 @@ private:
 	void wheelEvent(QWheelEvent *event);
 	void keyPressEvent(QKeyEvent *event);
 	void drawBackground(QPainter *painter, const QRectF &rect);
-	void resizeEvent(QResizeEvent *event);
 	void paintEvent(QPaintEvent *event);
 	void scrollContentsBy(int dx, int dy);
 	void mouseMoveEvent(QMouseEvent *event);
@@ -132,10 +137,11 @@ private:
 	Units _units;
 	CoordinatesFormat _coordinatesFormat;
 	qreal _mapOpacity;
+	Projection _projection;
 
 	bool _showMap, _showTracks, _showRoutes, _showAreas, _showWaypoints,
 	  _showWaypointLabels, _showPOI, _showPOILabels, _showRouteWaypoints,
-	  _showMarkers;
+	  _showMarkers, _showPathTicks;
 	bool _overlapPOIs;
 	int _trackWidth, _routeWidth, _areaWidth;
 	Qt::PenStyle _trackStyle, _routeStyle, _areaStyle;

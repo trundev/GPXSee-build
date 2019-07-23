@@ -7,6 +7,7 @@
 #include "data/poi.h"
 #include "data/data.h"
 #include "map/map.h"
+#include "map/pcs.h"
 #include "opengl.h"
 #include "trackitem.h"
 #include "routeitem.h"
@@ -38,6 +39,7 @@ MapView::MapView(Map *map, POI *poi, QWidget *parent)
 	setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	setRenderHint(QPainter::Antialiasing, true);
+	setResizeAnchor(QGraphicsView::AnchorViewCenter);
 	setAcceptDrops(false);
 
 	_mapScale = new ScaleItem();
@@ -48,8 +50,10 @@ MapView::MapView(Map *map, POI *poi, QWidget *parent)
 	_coordinates->setVisible(false);
 	_scene->addItem(_coordinates);
 
+	_projection = PCS::pcs(3857);
 	_map = map;
 	_map->load();
+	_map->setProjection(_projection);
 	connect(_map, SIGNAL(loaded()), this, SLOT(reloadMap()));
 
 	_poi = poi;
@@ -72,6 +76,7 @@ MapView::MapView(Map *map, POI *poi, QWidget *parent)
 	_overlapPOIs = true;
 	_showRouteWaypoints = true;
 	_showMarkers = true;
+	_showPathTicks = false;
 	_trackWidth = 3;
 	_routeWidth = 3;
 	_trackStyle = Qt::SolidLine;
@@ -122,6 +127,7 @@ PathItem *MapView::addTrack(const Track &track)
 	ti->setDigitalZoom(_digitalZoom);
 	ti->setMarkerColor(_markerColor);
 	ti->showMarker(_showMarkers);
+	ti->showTicks(_showPathTicks);
 	_scene->addItem(ti);
 
 	if (_showTracks)
@@ -151,6 +157,7 @@ PathItem *MapView::addRoute(const Route &route)
 	ri->setDigitalZoom(_digitalZoom);
 	ri->setMarkerColor(_markerColor);
 	ri->showMarker(_showMarkers);
+	ri->showTicks(_showPathTicks);
 	_scene->addItem(ri);
 
 	if (_showRoutes)
@@ -312,6 +319,7 @@ void MapView::setMap(Map *map)
 
 	_map = map;
 	_map->load();
+	_map->setProjection(_projection);
 #ifdef ENABLE_HIDPI
 	_map->setDevicePixelRatio(_deviceRatio, _mapRatio);
 #endif // ENABLE_HIDPI
@@ -720,6 +728,15 @@ void MapView::showMarkers(bool show)
 		_routes.at(i)->showMarker(show);
 }
 
+void MapView::showTicks(bool show)
+{
+	_showPathTicks = show;
+	for (int i = 0; i < _tracks.size(); i++)
+		_tracks.at(i)->showTicks(show);
+	for (int i = 0; i < _routes.size(); i++)
+		_routes.at(i)->showTicks(show);
+}
+
 void MapView::showMap(bool show)
 {
 	_showMap = show;
@@ -885,17 +902,6 @@ void MapView::drawBackground(QPainter *painter, const QRectF &rect)
 	}
 }
 
-void MapView::resizeEvent(QResizeEvent *event)
-{
-	QGraphicsView::resizeEvent(event);
-
-	int zoom = _map->zoom();
-	if (fitMapZoom() != zoom)
-		rescale();
-
-	centerOn(contentCenter());
-}
-
 void MapView::paintEvent(QPaintEvent *event)
 {
 	QPointF scaleScenePos = mapToScene(rect().bottomRight() + QPoint(
@@ -1011,4 +1017,27 @@ void MapView::setDevicePixelRatio(qreal deviceRatio, qreal mapRatio)
 	Q_UNUSED(deviceRatio);
 	Q_UNUSED(mapRatio);
 #endif // ENABLE_HIDPI
+}
+
+void MapView::setProjection(int id)
+{
+	Projection projection(PCS::pcs(id));
+	if (!projection.isValid())
+		return;
+
+	_projection = projection;
+
+	Coordinates center = _map->xy2ll(mapToScene(viewport()->rect().center()));
+	_map->setProjection(_projection);
+	rescale();
+	centerOn(_map->ll2xy(center));
+}
+
+void MapView::fitContentToSize()
+{
+	int zoom = _map->zoom();
+	if (fitMapZoom() != zoom)
+		rescale();
+
+	centerOn(contentCenter());
 }

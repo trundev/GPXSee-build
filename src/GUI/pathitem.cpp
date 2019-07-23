@@ -3,6 +3,7 @@
 #include <QPainter>
 #include "common/greatcircle.h"
 #include "map/map.h"
+#include "pathtickitem.h"
 #include "pathitem.h"
 
 
@@ -23,14 +24,17 @@ PathItem::PathItem(const Path &path, Map *map, QGraphicsItem *parent)
 {
 	Q_ASSERT(_path.isValid());
 
+	_units = Metric;
 	_digitalZoom = 0;
 	_width = 3;
 	QBrush brush(Qt::SolidPattern);
 	_pen = QPen(brush, _width);
 	_showMarker = true;
+	_showTicks = false;
 
 	updatePainterPath();
 	updateShape();
+	updateTicks();
 
 	_markerDistance = _path.first().first().distance();
 	_marker = new MarkerItem(this);
@@ -111,8 +115,7 @@ void PathItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
 	painter->drawPath(_painterPath);
 
 /*
-	QPen p = QPen(QBrush(Qt::red), 0);
-	painter->setPen(p);
+	painter->setPen(Qt::red);
 	painter->drawRect(boundingRect());
 */
 }
@@ -125,6 +128,7 @@ void PathItem::setMap(Map *map)
 
 	updatePainterPath();
 	updateShape();
+	updateTicks();
 
 	QPointF pos = position(_markerDistance);
 	if (isValid(pos))
@@ -137,6 +141,10 @@ void PathItem::setColor(const QColor &color)
 		return;
 
 	_pen.setColor(color);
+
+	for (int i = 0; i < _ticks.size(); i++)
+		_ticks[i]->setColor(color);
+
 	update();
 }
 
@@ -282,6 +290,74 @@ void PathItem::showMarker(bool show)
 
 	_showMarker = show;
 	_marker->setVisible(show && isValid(position(_markerDistance)));
+}
+
+qreal PathItem::xInM() const
+{
+	return (_units == Nautical) ? NMIINM : (_units == Imperial) ? MIINM : KMINM;
+}
+
+unsigned PathItem::tickSize() const
+{
+	qreal res = _map->resolution(sceneBoundingRect());
+
+	if (res < 10)
+		return 1;
+	else if (res < 25)
+		return 5;
+	else if (res < 100)
+		return 10;
+	else if (res < 500)
+		return 50;
+	else if (res < 2000)
+		return 100;
+	else if (res < 10000)
+		return 500;
+	else if (res < 20000)
+		return 1000;
+	else
+		return 5000;
+}
+
+void PathItem::updateTicks()
+{
+	qDeleteAll(_ticks);
+	_ticks.clear();
+
+	if (!_showTicks)
+		return;
+
+	int ts = tickSize();
+	int tc = _path.last().last().distance() / (ts * xInM());
+	QRect tr = PathTickItem::tickRect(ts * tc);
+
+	_ticks.resize(tc);
+	for (int i = 0; i < tc; i++) {
+		_ticks[i] = new PathTickItem(tr, (i + 1) * ts, this);
+		_ticks[i]->setPos(position((i + 1) * ts * xInM()));
+		_ticks[i]->setColor(_pen.color());
+		_ticks[i]->setToolTip(toolTip());
+	}
+}
+
+void PathItem::showTicks(bool show)
+{
+	if (_showTicks == show)
+		return;
+
+	prepareGeometryChange();
+	_showTicks = show;
+	updateTicks();
+}
+
+void PathItem::setUnits(Units units)
+{
+	if (_units == units)
+		return;
+
+	prepareGeometryChange();
+	_units = units;
+	updateTicks();
 }
 
 void PathItem::hoverEnterEvent(QGraphicsSceneHoverEvent *event)

@@ -3,7 +3,7 @@ unix:!macx {
 } else {
     TARGET = GPXSee
 }
-VERSION = 7.5
+VERSION = 7.11
 
 QT += core \
     gui \
@@ -86,6 +86,9 @@ HEADERS += src/common/config.h \
     src/GUI/mapview.h \
     src/GUI/font.h \
     src/GUI/areaitem.h \
+    src/map/IMG/bitmapline.h \
+    src/map/IMG/textpathitem.h \
+    src/map/IMG/textpointitem.h \
     src/map/projection.h \
     src/map/ellipsoid.h \
     src/map/datum.h \
@@ -165,7 +168,22 @@ HEADERS += src/common/config.h \
     src/map/calibrationpoint.h \
     src/map/color.h \
     src/data/exifparser.h \
-    src/data/imageinfo.h
+    src/data/imageinfo.h \
+    src/map/imgmap.h \
+    src/map/IMG/img.h \
+    src/map/IMG/subfile.h \
+    src/map/IMG/trefile.h \
+    src/map/IMG/rgnfile.h \
+    src/map/IMG/lblfile.h \
+    src/map/IMG/vectortile.h \
+    src/map/IMG/subdiv.h \
+    src/map/IMG/units.h \
+    src/map/IMG/style.h \
+    src/map/IMG/netfile.h \
+    src/GUI/limitedcombobox.h \
+    src/GUI/pathtickitem.h \
+    src/map/IMG/textitem.h \
+    src/map/IMG/label.h
 SOURCES += src/main.cpp \
     src/common/coordinates.cpp \
     src/common/evdata.h \
@@ -220,6 +238,9 @@ SOURCES += src/main.cpp \
     src/GUI/gearratiographitem.cpp \
     src/GUI/mapview.cpp \
     src/GUI/areaitem.cpp \
+    src/map/IMG/bitmapline.cpp \
+    src/map/IMG/textpathitem.cpp \
+    src/map/IMG/textpointitem.cpp \
     src/map/maplist.cpp \
     src/map/onlinemap.cpp \
     src/map/downloader.cpp \
@@ -285,14 +306,26 @@ SOURCES += src/main.cpp \
     src/map/obliquestereographic.cpp \
     src/GUI/coordinatesitem.cpp \
     src/map/rmap.cpp \
-    src/data/exifparser.cpp
+    src/data/exifparser.cpp \
+    src/map/imgmap.cpp \
+    src/map/IMG/img.cpp \
+    src/map/IMG/subfile.cpp \
+    src/map/IMG/trefile.cpp \
+    src/map/IMG/rgnfile.cpp \
+    src/map/IMG/lblfile.cpp \
+    src/map/IMG/vectortile.cpp \
+    src/map/IMG/style.cpp \
+    src/map/IMG/netfile.cpp \
+    src/GUI/pathtickitem.cpp \
+    src/map/IMG/textitem.cpp
 
 greaterThan(QT_MAJOR_VERSION, 4) {
     HEADERS += src/data/geojsonparser.h
     SOURCES += src/data/geojsonparser.cpp
 }
 
-DEFINES += APP_VERSION=\\\"$$VERSION\\\"
+DEFINES += APP_VERSION=\\\"$$VERSION\\\" \
+    QT_NO_DEPRECATED_WARNINGS
 DEFINES *= QT_USE_QSTRINGBUILDER
 
 RESOURCES += gpxsee.qrc
@@ -367,7 +400,7 @@ win32 {
 
 unix:!macx {
     isEmpty(PREFIX):PREFIX = /usr/local
-    lessThan(QT_MAJOR_VERSION, 5) {DEFINES += PREFIX=\\\"$$PREFIX\\\"}
+    DEFINES += PREFIX=\\\"$$PREFIX\\\"
 
     maps.files = pkg/maps/*
     maps.path = $$PREFIX/share/gpxsee/maps
