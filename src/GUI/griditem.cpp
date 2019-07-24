@@ -22,12 +22,18 @@ void GridItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
 	painter->setRenderHint(QPainter::Antialiasing, false);
 	painter->setPen(pen);
 
-	for (int i = 0; i < _xTicks.size(); i++)
-		painter->drawLine(_xTicks.at(i), 0, _xTicks.at(i),
-		  -_boundingRect.height());
+	/*
+	* Draw the horizontal grid-lines before the vertical as a workaround for the
+	* nasty graph-item ghost artifacts. These artifacts appears when scrolling
+	* zoomed (> 2x) view, that contains graph-items with negative values.
+	* See GraphView::_xZoom
+	*/
 	for (int i = 0; i < _yTicks.size(); i++)
 		painter->drawLine(0, -_yTicks.at(i), boundingRect().width(),
 		  -_yTicks.at(i));
+	for (int i = 0; i < _xTicks.size(); i++)
+		painter->drawLine(_xTicks.at(i), 0, _xTicks.at(i),
+		  -_boundingRect.height());
 
 /*
 	painter->setPen(Qt::red);
