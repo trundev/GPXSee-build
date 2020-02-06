@@ -1,0 +1,98 @@
+name: Build
+
+on: [push]
+
+env:
+  QTVER: v5.14.1
+  # QT-Build repo to download the pre-build QT asset
+  QT_BUILD_OWNER: trundev
+  QT_BUILD_REPO: QT-Build
+  # vcxproj parameters
+  BuildConfiguration: release
+  BuildPlatform: x64
+  vcvars_bat: '"C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Prepare MSVS environment
+      run: |
+        $tempfile = [IO.Path]::GetTempFileName()
+        $proc = start-process -NoNewWindow -Wait -PassThru -RedirectStandardOutput $tempfile "$env:ComSpec" "/c $env:vcvars_bat 2> nul && set"
+        if ($proc.ExitCode) {exit $proc.ExitCode}
+        Get-Content $tempfile | foreach-object {
+          $s = $_.Split("=",2)
+          if ($s.Length -eq 2) {
+            $n,$v = $s
+            # Export new variables only
+            if (-not $(Test-Path env:$n) -or $v -ne $(Get-Item env:$n).Value) {
+              echo "::set-env name=$n::$v"
+            }
+          }
+        }
+        del $tempfile
+
+    - name: Download QT Build (github-script)
+      uses: actions/github-script@0.4.0
+      if: false
+      env:
+        ASSET_POSTFIX: ${{ env.QTVER }}-win32-msvc_${{ env.VisualStudioVersion }}
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          tag = '${{ env.QTVER }}'
+          console.log('Get release by tag: ' + tag)
+          const result = await github.repos.getReleaseByTag({
+            owner: '${{ env.QT_BUILD_OWNER }}',
+            repo: '${{ env.QT_BUILD_REPO }}',
+            tag: tag
+          })
+          const assets = result.data.assets
+
+          for (i in assets) {
+            const a = assets[i]
+            console.log('Inspecting: ' + a.name + ', ' + a.label)
+            if ((a.name + a.label).includes('${{ env.ASSET_POSTFIX }}')) {
+              console.log('Downloading from: ' + a.url)
+              const result = await github.request(a.url)
+              // TODO: Unzip the result
+              return result
+            }
+          }
+
+    - name: Download QT Build (powershell)
+      if: true
+      env:
+        ASSET_POSTFIX: ${{ env.QTVER }}-win32-msvc_${{ env.VisualStudioVersion }}
+      run: |
+        $res = Invoke-WebRequest -H @{Authorization='token ${{ secrets.GITHUB_TOKEN }}'; Accept='application/json'} "https://api.github.com/repos/${{ env.QT_BUILD_OWNER }}/${{ env.QT_BUILD_REPO }}/releases/tags/${{ env.QTVER }}" | ConvertFrom-Json
+        cd ..
+        foreach ($a in $res.assets) {
+          echo "Inspecting $($a.name), $($a.label)..."
+          if (($a.name + $a.label) -like "*${{ env.ASSET_POSTFIX }}*") {
+            echo "Downloading $($a.url) to $($a.name)..."
+            Invoke-WebRequest -H @{Authorization='token ${{ secrets.GITHUB_TOKEN }}'; Accept='application/octet-stream'} $a.url -o $a.name
+            echo "Unzipping $($a.name)..."
+            unzip $a.name
+            echo "::add-path::$PWD\$a.name\bin"
+          }
+        }
+
+    - name: Build
+      run: |
+        echo "Running qmake..."
+        dir .. -D 2
+        qmake
+
+    - name: Browse Result
+      run: |
+        dir
+
+    - uses: actions/upload-artifact@v1
+      with:
+        name: Build-Artifact
+        path: build
