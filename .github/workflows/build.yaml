@@ -9,7 +9,6 @@ env:
   QT_BUILD_REPO: QT-Build
   # vcxproj parameters
   BuildConfiguration: release
-  BuildPlatform: x64
   vcvars_bat: '"C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"'
 
 jobs:
@@ -75,24 +74,37 @@ jobs:
           echo "Inspecting $($a.name), $($a.label)..."
           if (($a.name + $a.label) -like "*${{ env.ASSET_POSTFIX }}*") {
             echo "Downloading $($a.url) to $($a.name)..."
-            Invoke-WebRequest -H @{Authorization='token ${{ secrets.GITHUB_TOKEN }}'; Accept='application/octet-stream'} $a.url -o $a.name
+            Invoke-WebRequest -H @{Authorization='token ${{ secrets.GITHUB_TOKEN }}'; Accept='application/octet-stream'} $a.url -o ${{ runner.temp }}\$($a.name)
             echo "Unzipping $($a.name)..."
-            unzip $a.name
-            echo "::add-path::$PWD\$a.name\bin"
+            unzip ${{ runner.temp }}\$($a.name) -d QT-asset
+            echo "::add-path::$PWD\QT-asset\bin"
           }
         }
 
-    - name: Build
+    - name: Run qmake
       run: |
-        echo "Running qmake..."
-        dir .. -D 2
         qmake
 
-    - name: Browse Result
+    - name: Run nmake ${{ env.BuildConfiguration }}
       run: |
-        dir
+        nmake ${{ env.BuildConfiguration }}
+
+    - name: Run nmake install
+      run: |
+        nmake install
+
+    - name: Prepare Artifact
+      run: |
+        $dest = mkdir ../artifact
+        $generated = $(git ls-files -o -i --exclude='*')
+        ForEach ($file in $generated) {
+          $dest_file = $(Join-Path $dest $(Resolve-Path -Relative $file))
+          echo "$file -> $dest_file"
+          mkdir -Force $(Split-Path $dest_file)
+          Copy $file $dest_file
+        }
 
     - uses: actions/upload-artifact@v1
       with:
         name: Build-Artifact
-        path: build
+        path: ../artifact
