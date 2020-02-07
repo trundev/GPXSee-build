@@ -10,6 +10,8 @@ env:
   # vcxproj parameters
   BuildConfiguration: release
   vcvars_bat: '"C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"'
+  # Development options
+  #EXPORT_INTERMEDIATE: true
 
 jobs:
   build:
@@ -69,14 +71,17 @@ jobs:
         ASSET_POSTFIX: ${{ env.QTVER }}-win32-msvc_${{ env.VisualStudioVersion }}
       run: |
         $res = Invoke-WebRequest -H @{Authorization='token ${{ secrets.GITHUB_TOKEN }}'; Accept='application/json'} "https://api.github.com/repos/${{ env.QT_BUILD_OWNER }}/${{ env.QT_BUILD_REPO }}/releases/tags/${{ env.QTVER }}" | ConvertFrom-Json
+        if (! $?) { exit 255 }
         cd ..
         foreach ($a in $res.assets) {
           echo "Inspecting $($a.name), $($a.label)..."
           if (($a.name + $a.label) -like "*${{ env.ASSET_POSTFIX }}*") {
             echo "Downloading $($a.url) to $($a.name)..."
             Invoke-WebRequest -H @{Authorization='token ${{ secrets.GITHUB_TOKEN }}'; Accept='application/octet-stream'} $a.url -o ${{ runner.temp }}\$($a.name)
+            if (! $?) { exit 255 }
             echo "Unzipping $($a.name)..."
             unzip ${{ runner.temp }}\$($a.name) -d QT-asset
+            if (! $?) { exit 255 }
             echo "::add-path::$PWD\QT-asset\bin"
           }
         }
@@ -93,7 +98,8 @@ jobs:
       run: |
         nmake install
 
-    - name: Prepare Artifact
+    - name: Export Intermediate Files
+      if: env.EXPORT_INTERMEDIATE
       run: |
         $dest = mkdir ../artifact
         $generated = $(git ls-files -o -i --exclude='*')
@@ -105,6 +111,12 @@ jobs:
         }
 
     - uses: actions/upload-artifact@v1
+      if: env.EXPORT_INTERMEDIATE
       with:
-        name: Build-Artifact
+        name: Artifact-${{ github.sha }}
         path: ../artifact
+
+    - uses: actions/upload-artifact@v1
+      with:
+        name: GPXSee-QT_${{ env.QTVER }}
+        path: ${{ env.BuildConfiguration }}/GPXSee.exe
