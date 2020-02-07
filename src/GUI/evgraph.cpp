@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QLocale>
 #include <QSettings>
+#include <QContextMenuEvent>
 #include "data/data.h"
 #include "settings.h"
 #include "common/evdata.h"
