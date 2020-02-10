@@ -79,15 +79,20 @@ jobs:
             echo "Downloading $($a.url) to $($a.name)..."
             Invoke-WebRequest -H @{Authorization='token ${{ secrets.GITHUB_TOKEN }}'; Accept='application/octet-stream'} $a.url -o ${{ runner.temp }}\$($a.name)
             if (! $?) { exit 255 }
+            $QT_DIR = "$PWD\QT-asset"
             echo "Unzipping $($a.name)..."
-            unzip ${{ runner.temp }}\$($a.name) -d QT-asset
+            unzip ${{ runner.temp }}\$($a.name) -d $QT_DIR
             if (! $?) { exit 255 }
-            echo "::add-path::$PWD\QT-asset\bin"
+            echo "Update qt.conf with Paths.Prefix = $QT_DIR"
+            echo "[Paths]" "Prefix = $QT_DIR".Replace("\", "/") >> $QT_DIR\bin\qt.conf
+            echo "Add path: $QT_DIR\bin"
+            echo "::add-path::$QT_DIR\bin"
           }
         }
 
     - name: Run qmake
       run: |
+        qmake -query
         qmake
 
     - name: Run nmake ${{ env.BuildConfiguration }}
@@ -97,6 +102,16 @@ jobs:
     - name: Run nmake install
       run: |
         nmake install
+
+    - name: Select VER_REF and ASSET_POSTFIX
+      run: |
+        # Translate QTVER
+        $VER_REF = $(git describe)
+        echo "::set-env name=VER_REF::$VER_REF"
+        echo "VER_REF set to $VER_REF"
+        $ASSET_POSTFIX = "$VER_REF-QT_${{ env.QTVER }}"
+        echo "::set-env name=ASSET_POSTFIX::$ASSET_POSTFIX"
+        echo "ASSET_POSTFIX set to $ASSET_POSTFIX"
 
     - name: Export Intermediate Files
       if: env.EXPORT_INTERMEDIATE
@@ -113,10 +128,10 @@ jobs:
     - uses: actions/upload-artifact@v1
       if: env.EXPORT_INTERMEDIATE
       with:
-        name: Artifact-${{ github.sha }}
+        name: Artifact-${{ env.VER_REF }}
         path: ../artifact
 
     - uses: actions/upload-artifact@v1
       with:
-        name: GPXSee-QT_${{ env.QTVER }}
+        name: GPXSee-${{ env.ASSET_POSTFIX }}
         path: ${{ env.BuildConfiguration }}/GPXSee.exe
