@@ -3,8 +3,9 @@
 
 #include <QFont>
 #include <QGraphicsItem>
+#include "graphicsscene.h"
 
-class PathTickItem : public QGraphicsItem
+class PathTickItem : public GraphicsItem
 {
 public:
 	PathTickItem(const QRectF &tickRect, int value, QGraphicsItem *parent = 0);
@@ -16,7 +17,13 @@ public:
 	void setPos(const QPointF &pos);
 	void setColor(const QColor &color) {_brush = QBrush(color);}
 
+	int type() const {return parentItem()->type();}
+	QString info() const {return static_cast<GraphicsItem*>(parentItem())->info();}
+
 	static QRect tickRect(int value);
+
+protected:
+	void mousePressEvent(QGraphicsSceneMouseEvent *event);
 
 private:
 	QRectF _tickRect;

@@ -4,12 +4,12 @@
 
 
 CadenceGraphItem::CadenceGraphItem(const Graph &graph, GraphType type,
-  QGraphicsItem *parent) : GraphItem(graph, type, parent)
+  int width, const QColor &color, QGraphicsItem *parent)
+  : GraphItem(graph, type, width, color, parent)
 {
-	setToolTip(toolTip());
 }
 
-QString CadenceGraphItem::toolTip() const
+QString CadenceGraphItem::info() const
 {
 	ToolTip tt;
 	QLocale l(QLocale::system());

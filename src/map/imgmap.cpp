@@ -1,5 +1,6 @@
 #include <QFile>
 #include <QPainter>
+#include <QFont>
 #include <QPixmapCache>
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 #include <QtCore>
@@ -8,16 +9,20 @@
 #endif // QT_VERSION < 5
 #include "common/rectc.h"
 #include "common/wgs84.h"
+#include "common/range.h"
 #include "IMG/textpathitem.h"
 #include "IMG/textpointitem.h"
 #include "IMG/bitmapline.h"
+#include "IMG/style.h"
+#include "IMG/img.h"
+#include "IMG/gmap.h"
 #include "pcs.h"
 #include "rectd.h"
 #include "imgmap.h"
 
 
-#define TILE_SIZE   256
-#define TEXT_EXTENT 256
+#define TILE_SIZE   384
+#define TEXT_EXTENT 160
 
 #define AREA(rect) \
 	(rect.size().width() * rect.size().height())
@@ -33,18 +38,19 @@ public:
 	const QString &key() const {return _key;}
 	const QPoint &xy() const {return _xy;}
 	QImage &img() {return _img;}
-	QList<IMG::Poly> &polygons() {return _polygons;}
-	QList<IMG::Poly> &lines() {return _lines;}
-	QList<IMG::Point> &points() {return _points;}
+	QList<MapData::Poly> &polygons() {return _polygons;}
+	QList<MapData::Poly> &lines() {return _lines;}
+	QList<MapData::Point> &points() {return _points;}
 
 	void render()
 	{
 		QList<TextItem*> textItems;
 
-		_map->processPolygons(_polygons);
+		QRect tileRect(_xy, QSize(TILE_SIZE, TILE_SIZE));
+
 		_map->processPoints(_points, textItems);
-		_map->processLines(_lines, QRect(_xy, QSize(TILE_SIZE, TILE_SIZE)),
-		  textItems);
+		_map->processPolygons(_polygons, textItems);
+		_map->processLines(_lines, tileRect, textItems);
 
 		_img.fill(Qt::transparent);
 
@@ -67,18 +73,18 @@ private:
 	QPoint _xy;
 	QString _key;
 	QImage _img;
-	QList<IMG::Poly> _polygons;
-	QList<IMG::Poly> _lines;
-	QList<IMG::Point> _points;
+	QList<MapData::Poly> _polygons;
+	QList<MapData::Poly> _lines;
+	QList<MapData::Point> _points;
 };
 
 
-static Range zooms(12, 28);
+static const Range zooms(12, 28);
 
-static QColor shieldColor(Qt::white);
-static QColor shieldBgColor1("#dd3e3e");
-static QColor shieldBgColor2("#379947");
-static QColor shieldBgColor3("#4a7fc1");
+static const QColor shieldColor(Qt::white);
+static const QColor shieldBgColor1("#dd3e3e");
+static const QColor shieldBgColor2("#379947");
+static const QColor shieldBgColor3("#4a7fc1");
 
 static QString convertUnits(const QString &str)
 {
@@ -172,7 +178,7 @@ static int minShieldZoom(Label::Shield::Type type)
 	switch (type) {
 		case Label::Shield::USInterstate:
 		case Label::Shield::Hbox:
-			return 18;
+			return 17;
 		case Label::Shield::USShield:
 		case Label::Shield::Box:
 			return 19;
@@ -184,12 +190,56 @@ static int minShieldZoom(Label::Shield::Type type)
 	}
 }
 
+static qreal area(const QVector<QPointF> &polygon)
+{
+	qreal area = 0;
+
+	for (int i = 0; i < polygon.size(); i++) {
+		int j = (i + 1) % polygon.size();
+		area += polygon.at(i).x() * polygon.at(j).y();
+		area -= polygon.at(i).y() * polygon.at(j).x();
+	}
+	area /= 2.0;
+
+   return area;
+}
+
+static QPointF centroid(const QVector<QPointF> &polygon)
+{
+	qreal cx = 0, cy = 0;
+	qreal factor = 1.0 / (6.0 * area(polygon));
+
+	for (int i = 0; i < polygon.size(); i++) {
+		int j = (i + 1) % polygon.size();
+		qreal f = (polygon.at(i).x() * polygon.at(j).y() - polygon.at(j).x()
+		  * polygon.at(i).y());
+		cx += (polygon.at(i).x() + polygon.at(j).x()) * f;
+		cy += (polygon.at(i).y() + polygon.at(j).y()) * f;
+	}
+
+	return QPointF(cx * factor, cy * factor);
+}
+
+static bool rectNearPolygon(const QPolygonF &polygon, const QRectF &rect)
+{
+	return (polygon.boundingRect().contains(rect)
+	  && (polygon.containsPoint(rect.topLeft(), Qt::OddEvenFill)
+	  || polygon.containsPoint(rect.topRight(), Qt::OddEvenFill)
+	  || polygon.containsPoint(rect.bottomLeft(), Qt::OddEvenFill)
+	  || polygon.containsPoint(rect.bottomRight(), Qt::OddEvenFill)));
+}
+
 
 IMGMap::IMGMap(const QString &fileName, QObject *parent)
-  : Map(parent), _img(fileName), _projection(PCS::pcs(3857)), _valid(false)
+  : Map(parent), _projection(PCS::pcs(3857)), _valid(false)
 {
-	if (!_img.isValid()) {
-		_errorString = _img.errorString();
+	if (GMAP::isGMAP(fileName))
+		_data = new GMAP(fileName);
+	else
+		_data = new IMG(fileName);
+
+	if (!_data->isValid()) {
+		_errorString = _data->errorString();
 		return;
 	}
 
@@ -201,17 +251,17 @@ IMGMap::IMGMap(const QString &fileName, QObject *parent)
 
 void IMGMap::load()
 {
-	_img.load();
+	_data->load();
 }
 
 void IMGMap::unload()
 {
-	_img.clear();
+	_data->clear();
 }
 
 QRectF IMGMap::bounds()
 {
-	RectD prect(_img.bounds(), _projection);
+	RectD prect(_data->bounds(), _projection);
 	return QRectF(_transform.proj2img(prect.topLeft()),
 	  _transform.proj2img(prect.bottomRight()));
 }
@@ -259,8 +309,9 @@ void IMGMap::setZoom(int zoom)
 
 Transform IMGMap::transform(int zoom) const
 {
-	double scale = (2.0 * M_PI * WGS84_RADIUS) / (1<<zoom);
-	PointD topLeft(_projection.ll2xy(_img.bounds().topLeft()));
+	double scale = _projection.isGeographic()
+	  ? 360.0 / (1<<zoom) : (2.0 * M_PI * WGS84_RADIUS) / (1<<zoom);
+	PointD topLeft(_projection.ll2xy(_data->bounds().topLeft()));
 	return Transform(ReferencePoint(PointD(0, 0), topLeft),
 	  PointD(scale, scale));
 }
@@ -280,15 +331,14 @@ Coordinates IMGMap::xy2ll(const QPointF &p)
 	return _projection.xy2ll(_transform.img2proj(p));
 }
 
-
-void IMGMap::drawPolygons(QPainter *painter, const QList<IMG::Poly> &polygons)
+void IMGMap::drawPolygons(QPainter *painter, const QList<MapData::Poly> &polygons)
 {
-	for (int n = 0; n < _img.style()->drawOrder().size(); n++) {
+	for (int n = 0; n < _data->style()->drawOrder().size(); n++) {
 		for (int i = 0; i < polygons.size(); i++) {
-			const IMG::Poly &poly = polygons.at(i);
-			if (poly.type != _img.style()->drawOrder().at(n))
+			const MapData::Poly &poly = polygons.at(i);
+			if (poly.type != _data->style()->drawOrder().at(n))
 				continue;
-			const Style::Polygon &style = _img.style()->polygon(poly.type);
+			const Style::Polygon &style = _data->style()->polygon(poly.type);
 
 			painter->setPen(style.pen());
 			painter->setBrush(style.brush());
@@ -297,13 +347,13 @@ void IMGMap::drawPolygons(QPainter *painter, const QList<IMG::Poly> &polygons)
 	}
 }
 
-void IMGMap::drawLines(QPainter *painter, const QList<IMG::Poly> &lines)
+void IMGMap::drawLines(QPainter *painter, const QList<MapData::Poly> &lines)
 {
 	painter->setBrush(Qt::NoBrush);
 
 	for (int i = 0; i < lines.size(); i++) {
-		const IMG::Poly &poly = lines.at(i);
-		const Style::Line &style = _img.style()->line(poly.type);
+		const MapData::Poly &poly = lines.at(i);
+		const Style::Line &style = _data->style()->line(poly.type);
 
 		if (style.background() == Qt::NoPen)
 			continue;
@@ -313,8 +363,8 @@ void IMGMap::drawLines(QPainter *painter, const QList<IMG::Poly> &lines)
 	}
 
 	for (int i = 0; i < lines.size(); i++) {
-		const IMG::Poly &poly = lines.at(i);
-		const Style::Line &style = _img.style()->line(poly.type);
+		const MapData::Poly &poly = lines.at(i);
+		const Style::Line &style = _data->style()->line(poly.type);
 
 		if (!style.img().isNull())
 			BitmapLine::draw(painter, poly.points, style.img());
@@ -331,25 +381,42 @@ void IMGMap::drawTextItems(QPainter *painter, const QList<TextItem*> &textItems)
 		textItems.at(i)->paint(painter);
 }
 
-
-void IMGMap::processPolygons(QList<IMG::Poly> &polygons)
+void IMGMap::processPolygons(QList<MapData::Poly> &polygons,
+  QList<TextItem*> &textItems)
 {
 	for (int i = 0; i < polygons.size(); i++) {
-		IMG::Poly &poly = polygons[i];
+		MapData::Poly &poly = polygons[i];
 		for (int j = 0; j < poly.points.size(); j++) {
 			QPointF &p = poly.points[j];
 			p = ll2xy(Coordinates(p.x(), p.y()));
 		}
+
+		if (poly.label.text().isEmpty())
+			continue;
+
+		if (_zoom <= 23 && (Style::isWaterArea(poly.type)
+		  || Style::isMilitaryArea(poly.type)
+		  || Style::isNatureReserve(poly.type))) {
+			const Style::Polygon &style = _data->style()->polygon(poly.type);
+			TextPointItem *item = new TextPointItem(
+			  centroid(poly.points).toPoint(), &poly.label.text(),
+			  poiFont(), 0, &style.brush().color());
+			if (item->isValid() && !item->collides(textItems)
+			  && rectNearPolygon(poly.points, item->boundingRect()))
+				textItems.append(item);
+			else
+				delete item;
+		}
 	}
 }
 
-void IMGMap::processLines(QList<IMG::Poly> &lines, const QRect &tileRect,
+void IMGMap::processLines(QList<MapData::Poly> &lines, const QRect &tileRect,
   QList<TextItem*> &textItems)
 {
 	qStableSort(lines);
 
 	for (int i = 0; i < lines.size(); i++) {
-		IMG::Poly &poly = lines[i];
+		MapData::Poly &poly = lines[i];
 		for (int j = 0; j < poly.points.size(); j++) {
 			QPointF &p = poly.points[j];
 			p = ll2xy(Coordinates(p.x(), p.y()));
@@ -361,12 +428,12 @@ void IMGMap::processLines(QList<IMG::Poly> &lines, const QRect &tileRect,
 	processShields(lines, tileRect, textItems);
 }
 
-void IMGMap::processStreetNames(QList<IMG::Poly> &lines, const QRect &tileRect,
-  QList<TextItem*> &textItems)
+void IMGMap::processStreetNames(QList<MapData::Poly> &lines,
+  const QRect &tileRect, QList<TextItem*> &textItems)
 {
 	for (int i = 0; i < lines.size(); i++) {
-		IMG::Poly &poly = lines[i];
-		const Style::Line &style = _img.style()->line(poly.type);
+		MapData::Poly &poly = lines[i];
+		const Style::Line &style = _data->style()->line(poly.type);
 
 		if (style.img().isNull() && style.foreground() == Qt::NoPen)
 			continue;
@@ -390,7 +457,7 @@ void IMGMap::processStreetNames(QList<IMG::Poly> &lines, const QRect &tileRect,
 	}
 }
 
-void IMGMap::processShields(QList<IMG::Poly> &lines, const QRect &tileRect,
+void IMGMap::processShields(QList<MapData::Poly> &lines, const QRect &tileRect,
   QList<TextItem*> &textItems)
 {
 	for (int type = FIRST_SHIELD; type <= LAST_SHIELD; type++) {
@@ -401,7 +468,7 @@ void IMGMap::processShields(QList<IMG::Poly> &lines, const QRect &tileRect,
 		QHash<Label::Shield, const Label::Shield*> sp;
 
 		for (int i = 0; i < lines.size(); i++) {
-			const IMG::Poly &poly = lines.at(i);
+			const MapData::Poly &poly = lines.at(i);
 			const Label::Shield &shield = poly.label.shield();
 			if (!shield.isValid() || shield.type() != type
 			  || !Style::isMajorRoad(poly.type))
@@ -418,7 +485,7 @@ void IMGMap::processShields(QList<IMG::Poly> &lines, const QRect &tileRect,
 		  = shields.constBegin(); it != shields.constEnd(); ++it) {
 			const QPolygonF &p = it.value();
 			QRectF rect(p.boundingRect() & tileRect);
-			if (qSqrt(AREA(rect)) < 32)
+			if (qSqrt(AREA(rect)) < TILE_SIZE/8)
 				continue;
 
 			QMap<qreal, int> map;
@@ -454,14 +521,14 @@ void IMGMap::processShields(QList<IMG::Poly> &lines, const QRect &tileRect,
 	}
 }
 
-void IMGMap::processPoints(QList<IMG::Point> &points,
+void IMGMap::processPoints(QList<MapData::Point> &points,
   QList<TextItem*> &textItems)
 {
 	qSort(points);
 
 	for (int i = 0; i < points.size(); i++) {
-		IMG::Point &point = points[i];
-		const Style::Point &style = _img.style()->point(point.type);
+		MapData::Point &point = points[i];
+		const Style::Point &style = _data->style()->point(point.type);
 
 		if (point.poi && _zoom < minPOIZoom(Style::poiClass(point.type)))
 			continue;
@@ -515,7 +582,7 @@ void IMGMap::draw(QPainter *painter, const QRectF &rect, Flags flags)
 		for (int j = 0; j < height; j++) {
 			QPixmap pm;
 			QPoint ttl(tl.x() + i * TILE_SIZE, tl.y() + j * TILE_SIZE);
-			QString key = _img.fileName() + "-" + QString::number(_zoom) + "_"
+			QString key = _data->fileName() + "-" + QString::number(_zoom) + "_"
 			  + QString::number(ttl.x()) + "_" + QString::number(ttl.y());
 			if (QPixmapCache::find(key, pm))
 				painter->drawPixmap(ttl, pm);
@@ -525,13 +592,14 @@ void IMGMap::draw(QPainter *painter, const QRectF &rect, Flags flags)
 
 				RectD polyRect(_transform.img2proj(ttl), _transform.img2proj(
 				  QPointF(ttl.x() + TILE_SIZE, ttl.y() + TILE_SIZE)));
-				_img.objects(polyRect.toRectC(_projection, 4), _zoom,
-				  &(tile.polygons()), &(tile.lines()), 0);
+				_data->polys(polyRect.toRectC(_projection, 4), _zoom,
+				  &(tile.polygons()), &(tile.lines()));
+
 				RectD pointRect(_transform.img2proj(QPointF(ttl.x() - TEXT_EXTENT,
 				  ttl.y() - TEXT_EXTENT)), _transform.img2proj(QPointF(ttl.x()
 				  + TILE_SIZE + TEXT_EXTENT, ttl.y() + TILE_SIZE + TEXT_EXTENT)));
-				_img.objects(pointRect.toRectC(_projection, 4), _zoom,
-				  0, 0, &(tile.points()));
+				_data->points(pointRect.toRectC(_projection, 4), _zoom,
+				  &(tile.points()));
 			}
 		}
 	}

@@ -2,101 +2,99 @@
 #include "img.h"
 #include "subfile.h"
 
-SubFile::Type SubFile::type(const char str[3])
-{
-	if (!memcmp(str, "TRE", 3))
-		return TRE;
-	else if (!memcmp(str, "RGN", 3))
-		return RGN;
-	else if (!memcmp(str, "LBL", 3))
-		return LBL;
-	else if (!memcmp(str, "TYP", 3))
-		return TYP;
-	else if (!memcmp(str, "GMP", 3))
-		return GMP;
-	else if (!memcmp(str, "NET", 3))
-		return NET;
-	else
-		return Unknown;
-}
-
-SubFile::SubFile(QFile *file) : _img(0), _file(file), _size(0)
-{
-	if (!_file->open(QIODevice::ReadOnly))
-		qWarning("Error opening %s: %s", qPrintable(_file->fileName()),
-		  qPrintable(_file->errorString()));
-}
-
-bool SubFile::isValid() const
-{
-	return _file
-	  ? _file->isOpen()
-	  : ((quint32)_img->blockSize() * (quint32)_blocks.size() - _size
-		  < (quint32)_img->blockSize());
-}
 
 bool SubFile::seek(Handle &handle, quint32 pos) const
 {
-	Q_ASSERT(_img || _file);
+	if (handle._file) {
+		int blockNum = pos / BLOCK_SIZE;
 
-	if (_file)
-		return _file->seek(pos);
-	else {
+		if (handle._blockNum != blockNum) {
+			if (!handle._file->seek((qint64)blockNum * BLOCK_SIZE))
+				return false;
+			if (handle._file->read(handle._data.data(), BLOCK_SIZE) < 0)
+				return false;
+			handle._blockNum = blockNum;
+		}
+
+		handle._blockPos = pos % BLOCK_SIZE;
+		handle._pos = pos;
+
+		return true;
+	} else {
 		quint32 blockSize = _img->blockSize();
 		int blockNum = pos / blockSize;
 
-		if (handle.blockNum != blockNum) {
-			if (blockNum >= _blocks.size())
+		if (handle._blockNum != blockNum) {
+			if (blockNum >= _blocks->size())
 				return false;
-			if (!_img->readBlock(_blocks.at(blockNum), handle.data))
+			if (!_img->readBlock(_blocks->at(blockNum), handle._data.data()))
 				return false;
-			handle.blockNum = blockNum;
+			handle._blockNum = blockNum;
 		}
 
-		handle.blockPos = pos % blockSize;
-		handle.pos = pos;
+		handle._blockPos = pos % blockSize;
+		handle._pos = pos;
 
 		return true;
 	}
 }
 
-bool SubFile::readByte(Handle &handle, quint8 &val) const
+bool SubFile::readVUInt32(Handle &hdl, quint32 &val) const
 {
-	Q_ASSERT(_img || _file);
+	quint8 bytes, shift, b;
 
-	if (_file)
-		return _file->getChar((char*)&val);
-	else {
-		val = handle.data.at(handle.blockPos++);
-		handle.pos++;
-		return (handle.blockPos >= _img->blockSize())
-		  ? seek(handle, handle.pos) : true;
-	}
-}
+	if (!readByte(hdl, b))
+		return false;
 
-quint32 SubFile::size() const
-{
-	return _img ? _size : (quint32)_file->size();
-}
-
-QString SubFile::fileName() const
-{
-	return _img ? _img->fileName() : _file->fileName();
-}
-
-#ifndef QT_NO_DEBUG
-QDebug operator<<(QDebug dbg, const SubFile &file)
-{
-	bool continuous = true;
-	for (int i = 1; i < file._blocks.size(); i++) {
-		if (file._blocks.at(i) != file._blocks.at(i-1) + 1) {
-			continuous = false;
-			break;
+	if ((b & 1) == 0) {
+		if ((b & 2) == 0) {
+			bytes = ((b >> 2) & 1) ^ 3;
+			shift = 5;
+		} else {
+			shift = 6;
+			bytes = 1;
 		}
+	} else {
+		shift = 7;
+		bytes = 0;
 	}
 
-	dbg.nospace() << "SubFile(" << file._size << ", " << file._blocks.size()
-	  << ", " << continuous << ")";
-	return dbg.space();
+	val = b >> (8 - shift);
+
+	for (int i = 1; i <= bytes; i++) {
+		if (!readByte(hdl, b))
+			return false;
+		val |= (((quint32)b) << (i * 8)) >> (8 - shift);
+	}
+
+	return true;
 }
-#endif // QT_NO_DEBUG
+
+bool SubFile::readVBitfield32(Handle &hdl, quint32 &bitfield) const
+{
+	quint8 bits;
+
+	if (!readUInt8(hdl, bits))
+		return false;
+
+	if (!(bits & 1)) {
+		seek(hdl, hdl._pos - 1);
+		if (!((bits>>1) & 1)) {
+			if (!((bits>>2) & 1)) {
+				if (!readUInt32(hdl, bitfield))
+					return false;
+			} else {
+				if (!readUInt24(hdl, bitfield))
+					return false;
+			}
+			bitfield >>= 3;
+		} else {
+			if (!readUInt16(hdl, bitfield))
+				return false;
+			bitfield >>= 2;
+		}
+	} else
+		bitfield = bits>>1;
+
+	return true;
+}

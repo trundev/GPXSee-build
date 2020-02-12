@@ -3,7 +3,7 @@ unix:!macx {
 } else {
     TARGET = GPXSee
 }
-VERSION = 7.11
+VERSION = 7.21
 
 QT += core \
     gui \
@@ -19,6 +19,9 @@ equals(QT_MAJOR_VERSION, 5) : lessThan(QT_MINOR_VERSION, 4) {QT += opengl}
 
 INCLUDEPATH += ./src
 HEADERS += src/common/config.h \
+    src/GUI/graphicsscene.h \
+    src/GUI/popup.h \
+    src/common/garmin.h \
     src/common/staticassert.h \
     src/common/coordinates.h \
     src/common/range.h \
@@ -86,7 +89,14 @@ HEADERS += src/common/config.h \
     src/GUI/mapview.h \
     src/GUI/font.h \
     src/GUI/areaitem.h \
+    src/data/link.h \
     src/map/IMG/bitmapline.h \
+    src/map/IMG/bitstream.h \
+    src/map/IMG/deltastream.h \
+    src/map/IMG/gmap.h \
+    src/map/IMG/huffmanstream.h \
+    src/map/IMG/huffmantable.h \
+    src/map/IMG/mapdata.h \
     src/map/IMG/textpathitem.h \
     src/map/IMG/textpointitem.h \
     src/map/projection.h \
@@ -177,14 +187,19 @@ HEADERS += src/common/config.h \
     src/map/IMG/lblfile.h \
     src/map/IMG/vectortile.h \
     src/map/IMG/subdiv.h \
-    src/map/IMG/units.h \
     src/map/IMG/style.h \
     src/map/IMG/netfile.h \
     src/GUI/limitedcombobox.h \
     src/GUI/pathtickitem.h \
     src/map/IMG/textitem.h \
-    src/map/IMG/label.h
+    src/map/IMG/label.h \
+    src/data/csv.h \
+    src/data/cupparser.h \
+    src/data/gpiparser.h \
+    src/data/address.h \
+    src/data/smlparser.h
 SOURCES += src/main.cpp \
+    src/GUI/popup.cpp \
     src/common/coordinates.cpp \
     src/common/evdata.h \
     src/common/rectc.cpp \
@@ -239,6 +254,12 @@ SOURCES += src/main.cpp \
     src/GUI/mapview.cpp \
     src/GUI/areaitem.cpp \
     src/map/IMG/bitmapline.cpp \
+    src/map/IMG/bitstream.cpp \
+    src/map/IMG/deltastream.cpp \
+    src/map/IMG/gmap.cpp \
+    src/map/IMG/huffmanstream.cpp \
+    src/map/IMG/huffmantable.cpp \
+    src/map/IMG/mapdata.cpp \
     src/map/IMG/textpathitem.cpp \
     src/map/IMG/textpointitem.cpp \
     src/map/maplist.cpp \
@@ -317,7 +338,12 @@ SOURCES += src/main.cpp \
     src/map/IMG/style.cpp \
     src/map/IMG/netfile.cpp \
     src/GUI/pathtickitem.cpp \
-    src/map/IMG/textitem.cpp
+    src/map/IMG/textitem.cpp \
+    src/data/csv.cpp \
+    src/data/cupparser.cpp \
+    src/GUI/graphicsscene.cpp \
+    src/data/gpiparser.cpp \
+    src/data/smlparser.cpp
 
 greaterThan(QT_MAJOR_VERSION, 4) {
     HEADERS += src/data/geojsonparser.h
@@ -341,7 +367,9 @@ TRANSLATIONS = lang/gpxsee_en.ts \
     lang/gpxsee_da.ts \
     lang/gpxsee_tr.ts \
     lang/gpxsee_es.ts \
-    lang/gpxsee_pt_BR.ts
+    lang/gpxsee_pt_BR.ts \
+    lang/gpxsee_uk.ts \
+    lang/gpxsee_hu.ts
 
 macx {
     ICON = icons/gpxsee.icns
@@ -359,7 +387,9 @@ macx {
         lang/gpxsee_da.qm \
         lang/gpxsee_tr.qm \
         lang/gpxsee_es.qm \
-        lang/gpxsee_pt_BR.qm
+        lang/gpxsee_pt_BR.qm \
+        lang/gpxsee_uk.qm \
+        lang/gpxsee_hu.qm
     csv.path = Contents/Resources
     csv.files = pkg/csv
     maps.path = Contents/Resources
@@ -376,7 +406,10 @@ macx {
         icons/formats/wpt.icns \
         icons/formats/loc.icns \
         icons/formats/slf.icns \
-        icons/formats/json.icns
+        icons/formats/json.icns \
+        icons/formats/cup.icns \
+        icons/formats/gpi.icns \
+        icons/formats/sml.icns
     QMAKE_BUNDLE_DATA += locale maps icons csv
 }
 
@@ -393,7 +426,10 @@ win32 {
         icons/formats/wpt.ico \
         icons/formats/loc.ico \
         icons/formats/slf.ico \
-        icons/formats/json.ico
+        icons/formats/json.ico \
+        icons/formats/cup.ico \
+        icons/formats/gpi.ico \
+        icons/formats/sml.ico
     DEFINES += _USE_MATH_DEFINES \
         NOGDI
 }

@@ -38,6 +38,11 @@ void LOCParser::waypoint(Waypoint &waypoint)
 		} else if (_reader.name() == QLatin1String("coord")) {
 			waypoint.setCoordinates(coordinates());
 			_reader.skipCurrentElement();
+		} else if (_reader.name() == QLatin1String("link")) {
+			const QXmlStreamAttributes &attr = _reader.attributes();
+			QString URL(_reader.readElementText());
+			if (!URL.isEmpty())
+				waypoint.addLink(Link(URL, attr.value("text").toString()));
 		} else
 			_reader.skipCurrentElement();
 	}

@@ -3,36 +3,74 @@
 
 #include <QVector>
 #include <QDebug>
+#include <QFile>
+#include "img.h"
 
-class IMG;
-class QFile;
+
+#define BLOCK_SIZE 4096
 
 class SubFile
 {
 public:
 	enum Type {Unknown, TRE, RGN, LBL, NET, TYP, GMP};
 
-	struct Handle
+	class Handle
 	{
-		Handle() : blockNum(-1), blockPos(-1), pos(-1) {}
+	public:
+		Handle(const SubFile *subFile)
+		  : _file(0), _blockNum(-1), _blockPos(-1), _pos(-1)
+		{
+			if (subFile && subFile->_path) {
+				_file = new QFile(*(subFile->_path));
+				_file->open(QIODevice::ReadOnly);
+				_data.resize(BLOCK_SIZE);
+			} else if (subFile)
+				_data.resize(subFile->_img->blockSize());
+		}
+		~Handle() {delete _file;}
 
-		QByteArray data;
-		int blockNum;
-		int blockPos;
-		int pos;
+		int pos() const {return _pos;}
+
+	private:
+		friend class SubFile;
+
+		QFile *_file;
+		QByteArray _data;
+		int _blockNum;
+		int _blockPos;
+		int _pos;
 	};
 
-	SubFile(IMG *img, quint32 size) : _img(img), _file(0), _size(size) {}
-	SubFile(QFile *file);
+	SubFile(IMG *img)
+	  : _gmpOffset(0), _img(img), _blocks(new QVector<quint16>()), _path(0) {}
+	SubFile(SubFile *gmp, quint32 offset) : _gmpOffset(offset), _img(gmp->_img),
+	  _blocks(gmp->_blocks), _path(gmp->_path) {}
+	SubFile(const QString &path)
+	  : _gmpOffset(0), _img(0), _blocks(0), _path(new QString(path)) {}
+	~SubFile()
+	{
+		if (!_gmpOffset) {
+			delete _blocks;
+			delete _path;
+		}
+	}
 
-	void addBlock(quint16 block) {_blocks.append(block);}
-	bool isValid() const;
+	void addBlock(quint16 block) {_blocks->append(block);}
 
-	quint32 size() const;
 	bool seek(Handle &handle, quint32 pos) const;
-	bool readByte(Handle &handle, quint8 &val) const;
 
-	bool readUInt16(Handle &handle, quint16 &val) const
+	template<typename T>
+	bool readUInt8(Handle &handle, T &val) const
+	{
+		quint8 b;
+		if (!readByte(handle, b))
+			return false;
+		val = b;
+		return true;
+	}
+
+	template<typename T>
+	bool readUInt16(Handle &handle, T &val) const
 	{
 		quint8 b0, b1;
 		if (!(readByte(handle, b0) && readByte(handle, b1)))
@@ -80,22 +118,41 @@ public:
 		return true;
 	}
 
-	quint16 offset() const {return _blocks.first();}
-	QString fileName() const;
+	bool readVUInt32SW(Handle &hdl, quint32 bytes, quint32 &val) const
+	{
+		quint8 b;
 
-	static Type type(const char str[3]);
+		val = 0;
+		for (quint32 i = bytes; i; i--) {
+			if (!readByte(hdl, b))
+				return false;
+			val |= ((quint32)b) << ((i-1) * 8);
+		}
 
-	friend QDebug operator<<(QDebug dbg, const SubFile &file);
+		return true;
+	}
+
+	bool readVUInt32(Handle &hdl, quint32 &val) const;
+	bool readVBitfield32(Handle &hdl, quint32 &bitfield) const;
+
+	QString fileName() const {return _path ? *_path : _img->fileName();}
+
+protected:
+	quint32 _gmpOffset;
 
 private:
-	IMG *_img;
-	QFile *_file;
-	quint32 _size;
-	QVector<quint16> _blocks;
-};
+	bool readByte(Handle &handle, quint8 &val) const
+	{
+		int blockSize = _img ? _img->blockSize() : BLOCK_SIZE;
+		val = handle._data.at(handle._blockPos++);
+		handle._pos++;
+		return (handle._blockPos >= blockSize)
+		  ? seek(handle, handle._pos) : true;
+	}
 
-#ifndef QT_NO_DEBUG
-QDebug operator<<(QDebug dbg, const SubFile &file);
-#endif // QT_NO_DEBUG
+	IMG *_img;
+	QVector<quint16> *_blocks;
+	QString *_path;
+};
 
 #endif // SUBFILE_H

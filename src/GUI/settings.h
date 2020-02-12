@@ -135,6 +135,8 @@
 #define POWER_FILTER_DEFAULT              3
 #define OUTLIER_ELIMINATE_SETTING         "outlierEliminate"
 #define OUTLIER_ELIMINATE_DEFAULT         true
+#define AUTOMATIC_PAUSE_SETTING           "automaticPause"
+#define AUTOMATIC_PAUSE_DEFAULT           true
 #define PAUSE_SPEED_SETTING               "pauseSpeed"
 #define PAUSE_SPEED_DEFAULT               0.5 /* m/s */
 #define PAUSE_INTERVAL_SETTING            "pauseInterval"
@@ -152,7 +154,7 @@
 #define ENABLE_HTTP2_SETTING              "enableHTTP2"
 #define ENABLE_HTTP2_DEFAULT              true
 #define PIXMAP_CACHE_SETTING              "pixmapCache"
-#define PIXMAP_CACHE_DEFAULT              64 /* MB */
+#define PIXMAP_CACHE_DEFAULT              256 /* MB */
 #define CONNECTION_TIMEOUT_SETTING        "connectionTimeout"
 #define CONNECTION_TIMEOUT_DEFAULT        30 /* s */
 #define HIRES_PRINT_SETTING               "hiresPrint"

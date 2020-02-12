@@ -4,7 +4,8 @@
 
 
 ElevationGraphItem::ElevationGraphItem(const Graph &graph, GraphType type,
-  QGraphicsItem *parent) : GraphItem(graph, type, parent)
+  int width, const QColor &color, QGraphicsItem *parent)
+  : GraphItem(graph, type, width, color, parent)
 {
 	_min = GraphItem::min();
 	_max = GraphItem::max();
@@ -23,15 +24,13 @@ ElevationGraphItem::ElevationGraphItem(const Graph &graph, GraphType type,
 				_descent += prev - cur;
 		}
 	}
-
-	setToolTip(toolTip(Metric));
 }
 
-QString ElevationGraphItem::toolTip(Units units) const
+QString ElevationGraphItem::info() const
 {
 	ToolTip tt;
-	qreal scale = (units == Metric) ? 1.0 : M2FT;
-	QString su = (units == Metric) ? tr("m") : tr("ft");
+	qreal scale = (_units == Metric) ? 1.0 : M2FT;
+	QString su = (_units == Metric) ? tr("m") : tr("ft");
 	QLocale l(QLocale::system());
 
 	tt.insert(tr("Ascent"), l.toString(ascent() * scale, 'f', 0)
@@ -44,9 +43,4 @@ QString ElevationGraphItem::toolTip(Units units) const
 	  + UNIT_SPACE + su);
 
 	return tt.toString();
-}
-
-void ElevationGraphItem::setUnits(Units units)
-{
-	setToolTip(toolTip(units));
 }

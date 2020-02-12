@@ -5,7 +5,7 @@
 #include "trackitem.h"
 
 
-QString TrackItem::toolTip(Units units) const
+QString TrackItem::info() const
 {
 	ToolTip tt;
 
@@ -14,13 +14,24 @@ QString TrackItem::toolTip(Units units) const
 	if (!_desc.isEmpty())
 		tt.insert(tr("Description"), _desc);
 	tt.insert(tr("Distance"), Format::distance(path().last().last().distance(),
-	  units));
+	  _units));
 	if  (_time > 0)
 		tt.insert(tr("Total time"), Format::timeSpan(_time));
 	if  (_movingTime > 0)
 		tt.insert(tr("Moving time"), Format::timeSpan(_movingTime));
 	if (!_date.isNull())
 		tt.insert(tr("Date"), _date.toString(Qt::SystemLocaleShortDate));
+	if (!_links.isEmpty()) {
+		QString links;
+		for (int i = 0; i < _links.size(); i++) {
+			const Link &link = _links.at(i);
+			links.append(QString("<a href=\"%0\">%1</a>").arg(link.URL(),
+			  link.text().isEmpty() ? link.URL() : link.text()));
+			if (i != _links.size() - 1)
+				links.append("<br/>");
+		}
+		tt.insert(tr("Links"), links);
+	}
 
 	return tt.toString();
 }
@@ -30,15 +41,8 @@ TrackItem::TrackItem(const Track &track, Map *map, QGraphicsItem *parent)
 {
 	_name = track.name();
 	_desc = track.description();
+	_links = track.links();
 	_date = track.date();
 	_time = track.time();
 	_movingTime = track.movingTime();
-
-	setToolTip(toolTip(Metric));
-}
-
-void TrackItem::setUnits(Units units)
-{
-	PathItem::setUnits(units);
-	setToolTip(toolTip(units));
 }

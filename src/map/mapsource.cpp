@@ -32,7 +32,7 @@ Range MapSource::zooms(QXmlStreamReader &reader)
 
 	if (attr.hasAttribute("min")) {
 		min = attr.value("min").toString().toInt(&res);
-		if (!res || !OSM::ZOOMS.contains(min)) {
+		if (!res || min < 0) {
 			reader.raiseError("Invalid minimal zoom level");
 			return Range();
 		}
@@ -41,17 +41,12 @@ Range MapSource::zooms(QXmlStreamReader &reader)
 
 	if (attr.hasAttribute("max")) {
 		max = attr.value("max").toString().toInt(&res);
-		if (!res || !OSM::ZOOMS.contains(max)) {
+		if (!res || max < min) {
 			reader.raiseError("Invalid maximal zoom level");
 			return Range();
 		}
 	} else
 		max = OSM::ZOOMS.max();
-
-	if (min > max) {
-		reader.raiseError("Invalid maximal/minimal zoom level combination");
-		return Range();
-	}
 
 	return Range(min, max);
 }
@@ -196,8 +191,8 @@ void MapSource::map(QXmlStreamReader &reader, Config &config)
 			if (!attr.hasAttribute("id"))
 				reader.raiseError("Missing dimension id");
 			else
-				config.dimensions.append(KV(attr.value("id").toString(),
-				  reader.readElementText()));
+				config.dimensions.append(KV<QString, QString>
+				  (attr.value("id").toString(), reader.readElementText()));
 		} else if (reader.name() == "crs") {
 			config.coordinateSystem = coordinateSystem(reader);
 			config.crs = reader.readElementText();
@@ -225,6 +220,20 @@ void MapSource::map(QXmlStreamReader &reader, Config &config)
 		} else
 			reader.skipCurrentElement();
 	}
+}
+
+bool MapSource::isMap(const QString &path)
+{
+	QFile file(path);
+
+	if (!file.open(QFile::ReadOnly | QFile::Text))
+		return false;
+
+	QXmlStreamReader reader(&file);
+	if (reader.readNextStartElement() && reader.name() == "map")
+		return true;
+
+	return false;
 }
 
 Map *MapSource::loadMap(const QString &path, QString &errorString)

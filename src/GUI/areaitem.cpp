@@ -2,12 +2,13 @@
 #include <QApplication>
 #include <QCursor>
 #include <QPainter>
+#include <QGraphicsSceneMouseEvent>
 #include "map/map.h"
-#include "tooltip.h"
+#include "popup.h"
 #include "areaitem.h"
 
 
-QString AreaItem::toolTip() const
+QString AreaItem::info() const
 {
 	ToolTip tt;
 
@@ -20,8 +21,8 @@ QString AreaItem::toolTip() const
 	return tt.toString();
 }
 
-AreaItem::AreaItem(const Area &area, Map *map, QGraphicsItem *parent)
-  : QGraphicsItem(parent), _area(area)
+AreaItem::AreaItem(const Area &area, Map *map, GraphicsItem *parent)
+  : GraphicsItem(parent), _area(area)
 {
 	_map = map;
 	_digitalZoom = 0;
@@ -35,8 +36,6 @@ AreaItem::AreaItem(const Area &area, Map *map, QGraphicsItem *parent)
 
 	setCursor(Qt::ArrowCursor);
 	setAcceptHoverEvents(true);
-
-	setToolTip(toolTip());
 }
 
 
@@ -152,4 +151,28 @@ void AreaItem::setDigitalZoom(int zoom)
 
 	_digitalZoom = zoom;
 	_pen.setWidthF(_width * pow(2, -_digitalZoom));
+}
+
+void AreaItem::hoverEnterEvent(QGraphicsSceneHoverEvent *event)
+{
+	Q_UNUSED(event);
+
+	_pen.setWidthF((_width + 1) * pow(2, -_digitalZoom));
+	setZValue(zValue() + 1.0);
+	update();
+}
+
+void AreaItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
+{
+	Q_UNUSED(event);
+
+	_pen.setWidthF(_width * pow(2, -_digitalZoom));
+	setZValue(zValue() - 1.0);
+	update();
+}
+
+void AreaItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
+{
+	Popup::show(event->screenPos(), info(), event->widget());
+	QGraphicsItem::mousePressEvent(event);
 }

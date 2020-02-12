@@ -1,4 +1,3 @@
-#include "dem.h"
 #include "track.h"
 
 
@@ -8,13 +7,23 @@ int Track::_heartRateWindow = 3;
 int Track::_cadenceWindow = 3;
 int Track::_powerWindow = 3;
 
+bool Track::_automaticPause = true;
 qreal Track::_pauseSpeed = 0.5;
 int Track::_pauseInterval = 10;
 
 bool Track::_outlierEliminate = true;
 bool Track::_useReportedSpeed = false;
-bool Track::_useDEM = false;
 
+
+static qreal avg(const QVector<qreal> &v)
+{
+	qreal sum = 0;
+
+	for (int i = 0; i < v.size(); i++)
+		sum += v.at(i);
+
+	return sum/v.size();
+}
 
 static qreal median(QVector<qreal> &v)
 {
@@ -26,8 +35,7 @@ static qreal MAD(QVector<qreal> &v, qreal m)
 {
 	for (int i = 0; i < v.size(); i++)
 		v[i] = qAbs(v.at(i) - m);
-	qSort(v.begin(), v.end());
-	return v.at(v.size() / 2);
+	return median(v);
 }
 
 static QSet<int> eliminate(const QVector<qreal> &v)
@@ -76,33 +84,50 @@ Track::Track(const TrackData &data) : _data(data), _pause(0)
 
 	for (int i = 0; i < _data.size(); i++) {
 		const SegmentData &sd = _data.at(i);
+		_segments.append(Segment());
 		if (sd.isEmpty())
 			continue;
 
 		// precompute distances, times, speeds and acceleration
 		QVector<qreal> acceleration;
 
-		_segments.append(Segment());
 		Segment &seg = _segments.last();
 
-		seg.distance.append(i ? _segments.at(i-1).distance.last() : 0);
-		seg.time.append(i ? _segments.at(i-1).time.last() :
+		seg.distance.append(i && !_segments.at(i-1).distance.isEmpty()
+		  ? _segments.at(i-1).distance.last() : 0);
+		seg.time.append(i && !_segments.at(i-1).time.isEmpty()
+		  ? _segments.at(i-1).time.last() :
 		  sd.first().hasTimestamp() ? 0 : NAN);
 		seg.speed.append(sd.first().hasTimestamp() ? 0 : NAN);
 		acceleration.append(sd.first().hasTimestamp() ? 0 : NAN);
+		bool hasTime = !std::isnan(seg.time.first());
 
 		for (int j = 1; j < sd.size(); j++) {
 			ds = sd.at(j).coordinates().distanceTo(
 			  sd.at(j-1).coordinates());
 			seg.distance.append(seg.distance.last() + ds);
 
-			if (sd.at(j).timestamp() >= sd.at(j-1).timestamp())
-				dt = sd.at(j-1).timestamp().msecsTo(
-				  sd.at(j).timestamp()) / 1000.0;
-			else {
-				qWarning("%s: %s: time skew detected", qPrintable(_data.name()),
-				  qPrintable(sd.at(j).timestamp().toString(Qt::ISODate)));
-				dt = 0;
+			if (hasTime && sd.at(j).timestamp().isValid()) {
+				if (sd.at(j).timestamp() > sd.at(j-1).timestamp())
+					dt = sd.at(j-1).timestamp().msecsTo(
+					  sd.at(j).timestamp()) / 1000.0;
+				else {
+					qWarning("%s: %s: time skew detected", qPrintable(
+					  _data.name()), qPrintable(sd.at(j).timestamp().toString(
+					  Qt::ISODate)));
+					dt = 0;
+				}
+			} else {
+				dt = NAN;
+				if (hasTime) {
+					qWarning("%s: missing timestamp(s), time graphs disabled",
+					  qPrintable(_data.name()));
+					hasTime = false;
+					for (int i = 0; i < seg.time.size(); i++)
+						seg.time[i] = NAN;
+					for (int i = 0; i < seg.speed.size(); i++)
+						seg.speed[i] = NAN;
+				}
 			}
 			seg.time.append(seg.time.last() + dt);
 
@@ -117,13 +142,35 @@ Track::Track(const TrackData &data) : _data(data), _pause(0)
 			}
 		}
 
+		if (!hasTime)
+			continue;
+
+
 		// get stop-points + pause duration
+		int pauseInterval;
+		qreal pauseSpeed;
+
+		if (_automaticPause) {
+			pauseSpeed = (avg(seg.speed) > 2.8) ? 0.40 : 0.15;
+			pauseInterval = 10;
+		} else {
+			pauseSpeed = _pauseSpeed;
+			pauseInterval = _pauseInterval;
+		}
+
+		int ss = 0, la = 0;
 		for (int j = 1; j < seg.time.size(); j++) {
-			if (seg.time.at(j) > seg.time.at(j-1) + _pauseInterval
-			  && seg.speed.at(j) < _pauseSpeed) {
-				_pause += seg.time.at(j) - seg.time.at(j-1);
-				seg.stop.insert(j-1);
-				seg.stop.insert(j);
+			if (seg.speed.at(j) > pauseSpeed)
+				ss = -1;
+			else if (ss < 0)
+				ss = j-1;
+
+			if (ss >= 0 && seg.time.at(j) > seg.time.at(ss) + pauseInterval) {
+				int l = qMax(ss, la);
+				_pause += seg.time.at(j) - seg.time.at(l);
+				for (int k = l; k <= j; k++)
+					seg.stop.insert(k);
+				la = j;
 			}
 		}
 
@@ -178,21 +225,10 @@ Graph Track::elevation() const
 		GraphSegment gs;
 
 		for (int j = 0; j < sd.size(); j++) {
-			if (seg.outliers.contains(j))
+			if (!sd.at(j).hasElevation() || seg.outliers.contains(j))
 				continue;
-
-			if (sd.at(j).hasElevation() && !_useDEM)
-				gs.append(GraphPoint(seg.distance.at(j), seg.time.at(j),
-				  sd.at(j).elevation()));
-			else {
-				qreal elevation = DEM::elevation(sd.at(j).coordinates());
-				if (!std::isnan(elevation))
-					gs.append(GraphPoint(seg.distance.at(j), seg.time.at(j),
-					  elevation));
-				else if (sd.at(j).hasElevation())
-					gs.append(GraphPoint(seg.distance.at(j), seg.time.at(j),
-					  sd.at(j).elevation()));
-			}
+			gs.append(GraphPoint(seg.distance.at(j), seg.time.at(j),
+			  sd.at(j).elevation()));
 		}
 
 		ret.append(filter(gs, _elevationWindow));

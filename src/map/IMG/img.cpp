@@ -1,35 +1,41 @@
-#include <QSet>
+#include <QMap>
 #include <QtEndian>
-#include "common/programpaths.h"
 #include "vectortile.h"
 #include "img.h"
 
 
-#define CACHE_SIZE 8388608 /* 8MB */
+typedef QMap<QByteArray, VectorTile*> TileMap;
 
+static SubFile::Type tileType(const char str[3])
+{
+	if (!memcmp(str, "TRE", 3))
+		return SubFile::TRE;
+	else if (!memcmp(str, "RGN", 3))
+		return SubFile::RGN;
+	else if (!memcmp(str, "LBL", 3))
+		return SubFile::LBL;
+	else if (!memcmp(str, "TYP", 3))
+		return SubFile::TYP;
+	else if (!memcmp(str, "GMP", 3))
+		return SubFile::GMP;
+	else if (!memcmp(str, "NET", 3))
+		return SubFile::NET;
+	else
+		return SubFile::Unknown;
+}
+
+IMG::IMG(const QString &fileName) : _file(fileName)
+{
 #define CHECK(condition) \
 	if (!(condition)) { \
-		_errorString = "Invalid/corrupted IMG file"; \
+		_errorString = "Unsupported or invalid IMG file"; \
+		qDeleteAll(tileMap); \
 		return; \
 	}
 
-struct CTX
-{
-	CTX(const RectC &rect, int bits, QList<IMG::Poly> *polygons,
-	  QList<IMG::Poly> *lines, QList<IMG::Point> *points)
-	  : rect(rect), bits(bits), polygons(polygons), lines(lines),
-	  points(points) {}
+	TileMap tileMap;
+	QByteArray typFile;
 
-	const RectC &rect;
-	int bits;
-	QList<IMG::Poly> *polygons;
-	QList<IMG::Poly> *lines;
-	QList<IMG::Point> *points;
-};
-
-IMG::IMG(const QString &fileName)
-  : _file(fileName), _typ(0), _style(0), _valid(false)
-{
 	if (!_file.open(QFile::ReadOnly)) {
 		_errorString = _file.errorString();
 		return;
@@ -50,10 +56,10 @@ IMG::IMG(const QString &fileName)
 	CHECK(_file.seek(0x49) && read(d1, sizeof(d1)) && _file.seek(0x61)
 	  && readValue(e1) && readValue(e2) && _file.seek(0x65)
 	  && read(d2, sizeof(d2)));
+
 	QByteArray nba(QByteArray(d1, sizeof(d1)) + QByteArray(d2, sizeof(d2)));
-	_name = QString(nba).trimmed();
+	_name = QString::fromLatin1(nba.constData(), nba.size()-1).trimmed();
 	_blockSize = 1 << (e1 + e2);
-	_blockCache.setMaxCost(CACHE_SIZE / _blockSize);
 
 	// Read the FAT table
 	quint8 flag;
@@ -74,34 +80,25 @@ IMG::IMG(const QString &fileName)
 	offset += 512;
 	int cnt = (size - offset) / 512;
 
-
-	QMap<QString, VectorTile*> tileMap;
-	QString typFile;
-
 	// Read FAT blocks describing the IMG sub-files
 	for (int i = 0; i < cnt; i++) {
 		quint16 block;
 		CHECK(_file.seek(offset) && readValue(flag) && read(name, sizeof(name))
 		  && read(type, sizeof(type)) && readValue(size) && readValue(part));
-		SubFile::Type tt = SubFile::type(type);
+		SubFile::Type tt = tileType(type);
 
-		if (tt == SubFile::GMP) {
-			_errorString = "NT maps not supported";
-			return;
-		}
-
-		QString fn(QByteArray(name, sizeof(name)));
+		QByteArray fn(name, sizeof(name));
 		if (VectorTile::isTileFile(tt)) {
 			VectorTile *tile;
-			QMap<QString, VectorTile*>::iterator it = tileMap.find(fn);
-			if (it == tileMap.end()) {
+			TileMap::const_iterator it = tileMap.find(fn);
+			if (it == tileMap.constEnd()) {
 				tile = new VectorTile();
 				tileMap.insert(fn, tile);
 			} else
 				tile = *it;
 
 			SubFile *file = part ? tile->file(tt)
-			  : tile->addFile(this, tt, size);
+			  : tile->addFile(this, tt);
 			CHECK(file);
 
 			_file.seek(offset + 0x20);
@@ -114,7 +111,7 @@ IMG::IMG(const QString &fileName)
 		} else if (tt == SubFile::TYP) {
 			SubFile *typ = 0;
 			if (typFile.isNull()) {
-				_typ = new SubFile(this, size);
+				_typ = new SubFile(this);
 				typ = _typ;
 				typFile = fn;
 			} else if (fn == typFile)
@@ -135,80 +132,31 @@ IMG::IMG(const QString &fileName)
 	}
 
 	// Create tile tree
-	for (QMap<QString, VectorTile*>::iterator it = tileMap.begin();
-	  it != tileMap.end(); ++it) {
-		CHECK((*it)->init());
+	for (TileMap::const_iterator it = tileMap.constBegin();
+	  it != tileMap.constEnd(); ++it) {
+		VectorTile *tile = it.value();
+
+		if (!tile->init(false)) {
+			qWarning("%s: %s: Invalid map tile", qPrintable(_file.fileName()),
+			  qPrintable(it.key()));
+			delete tile;
+			continue;
+		}
 
 		double min[2], max[2];
-		min[0] = (*it)->bounds().left();
-		min[1] = (*it)->bounds().bottom();
-		max[0] = (*it)->bounds().right();
-		max[1] = (*it)->bounds().top();
-		_tileTree.Insert(min, max, *it);
+		min[0] = tile->bounds().left();
+		min[1] = tile->bounds().bottom();
+		max[0] = tile->bounds().right();
+		max[1] = tile->bounds().top();
+		_tileTree.Insert(min, max, tile);
 
-		_bounds |= (*it)->bounds();
+		_bounds |= tile->bounds();
 	}
 
-	_valid = true;
-}
-
-IMG::~IMG()
-{
-	TileTree::Iterator it;
-	for (_tileTree.GetFirst(it); !_tileTree.IsNull(it); _tileTree.GetNext(it))
-		delete _tileTree.GetAt(it);
-
-	delete _typ;
-	delete _style;
-}
-
-void IMG::load()
-{
-	Q_ASSERT(!_style);
-
-	if (_typ && _typ->isValid())
-		_style = new Style(_typ);
-	else {
-		QFile typFile(ProgramPaths::typFile());
-		if (typFile.exists()) {
-			SubFile typ(&typFile);
-			_style = new Style(&typ);
-		} else
-			_style = new Style();
-	}
-}
-
-void IMG::clear()
-{
-	TileTree::Iterator it;
-	for (_tileTree.GetFirst(it); !_tileTree.IsNull(it); _tileTree.GetNext(it))
-		_tileTree.GetAt(it)->clear();
-
-	delete _style;
-	_style = 0;
-
-	_blockCache.clear();
-}
-
-static bool cb(VectorTile *tile, void *context)
-{
-	CTX *ctx = (CTX*)context;
-	tile->objects(ctx->rect, ctx->bits, ctx->polygons, ctx->lines, ctx->points);
-	return true;
-}
-
-void IMG::objects(const RectC &rect, int bits, QList<Poly> *polygons,
-  QList<Poly> *lines, QList<Point> *points)
-{
-	CTX ctx(rect, bits, polygons, lines, points);
-	double min[2], max[2];
-
-	min[0] = rect.left();
-	min[1] = rect.bottom();
-	max[0] = rect.right();
-	max[1] = rect.top();
-
-	_tileTree.Search(min, max, cb, &ctx);
+	if (!_tileTree.Count())
+		_errorString = "No usable map tile found";
+	else
+		_valid = true;
 }
 
 qint64 IMG::read(char *data, qint64 maxSize)
@@ -227,41 +175,17 @@ template<class T> bool IMG::readValue(T &val)
 	if (read((char*)&data, sizeof(T)) < (qint64)sizeof(T))
 		return false;
 
-	if (sizeof(T) > 1)
-		val = qFromLittleEndian(data);
-	else
-		val = data;
+	val = qFromLittleEndian(data);
 
 	return true;
 }
 
-bool IMG::readBlock(int blockNum, QByteArray &data)
+bool IMG::readBlock(int blockNum, char *data)
 {
-	QByteArray *block = _blockCache[blockNum];
-	if (!block) {
-		if (!_file.seek((qint64)blockNum * (qint64)_blockSize))
-			return false;
-		data.resize(_blockSize);
-		if (read(data.data(), _blockSize) < _blockSize)
-			return false;
-		_blockCache.insert(blockNum, new QByteArray(data));
-	} else
-		data = *block;
+	if (!_file.seek((qint64)blockNum * (qint64)_blockSize))
+		return false;
+	if (read(data, _blockSize) < _blockSize)
+		return false;
 
 	return true;
 }
-
-#ifndef QT_NO_DEBUG
-QDebug operator<<(QDebug dbg, const IMG::Point &point)
-{
-	dbg.nospace() << "Point(" << hex << point.type << ", " << point.label
-	  << ", " << point.poi << ")";
-	return dbg.space();
-}
-
-QDebug operator<<(QDebug dbg, const IMG::Poly &poly)
-{
-	dbg.nospace() << "Poly(" << hex << poly.type << ", " << poly.label << ")";
-	return dbg.space();
-}
-#endif // QT_NO_DEBUG

@@ -35,7 +35,8 @@ static QString capitalize(const QString &str)
 	if (str.isEmpty())
 		return str;
 	for (int i = 0; i < str.size(); i++)
-		if (str.at(i).isLetter() && !str.at(i).isUpper())
+		if (str.at(i).isLetter() && !(str.at(i).isUpper()
+		  || str.at(i) == QChar(0x00DF)))
 			return str;
 
 	QString ret(str);
@@ -49,19 +50,21 @@ static QString capitalize(const QString &str)
 }
 
 
-bool LBLFile::init()
+bool LBLFile::init(Handle &hdl)
 {
-	Handle hdl;
 	quint16 codepage;
+	quint8 multiplier, poiMultiplier;
 
-	if (!(seek(hdl, 0x15) && readUInt32(hdl, _offset)
-	  && readUInt32(hdl, _size) && readByte(hdl, _multiplier)
-	  && readByte(hdl, _encoding) && seek(hdl, 0x57)
+	if (!(seek(hdl, _gmpOffset + 0x15) && readUInt32(hdl, _offset)
+	  && readUInt32(hdl, _size) && readUInt8(hdl, multiplier)
+	  && readUInt8(hdl, _encoding) && seek(hdl, _gmpOffset + 0x57)
 	  && readUInt32(hdl, _poiOffset) && readUInt32(hdl, _poiSize)
-	  && seek(hdl, 0xAA) && readUInt16(hdl, codepage)))
+	  && readUInt8(hdl, poiMultiplier) && seek(hdl, _gmpOffset + 0xAA)
+	  && readUInt16(hdl, codepage)))
 		return false;
 
-	_multiplier = 1<<_multiplier;
+	_multiplier = 1<<multiplier;
+	_poiMultiplier = 1<<poiMultiplier;
 
 	if (codepage == 65001)
 		_codec = QTextCodec::codecForName("UTF-8");
@@ -86,7 +89,7 @@ Label LBLFile::label6b(Handle &hdl, quint32 offset) const
 		return Label();
 
 	while (true) {
-		if (!(readByte(hdl, b1) && readByte(hdl, b2) && readByte(hdl, b3)))
+		if (!(readUInt8(hdl, b1) && readUInt8(hdl, b2) && readUInt8(hdl, b3)))
 			return Label();
 
 		int c[]= {b1>>2, (b1&0x3)<<4|b2>>4, (b2&0xF)<<2|b3>>6, b3&0x3F};
@@ -135,7 +138,7 @@ Label LBLFile::label8b(Handle &hdl, quint32 offset) const
 		return Label();
 
 	while (true) {
-		if (!readByte(hdl, c))
+		if (!readUInt8(hdl, c))
 			return Label();
 		if (!c || c == 0x1d)
 			break;
@@ -161,14 +164,15 @@ Label LBLFile::label8b(Handle &hdl, quint32 offset) const
 
 Label LBLFile::label(Handle &hdl, quint32 offset, bool poi)
 {
-	if (!_size && !init())
+	if (!_multiplier && !init(hdl))
 		return QString();
 
 	quint32 labelOffset;
 	if (poi) {
 		quint32 poiOffset;
-		if (!(seek(hdl, _poiOffset + offset) && readUInt24(hdl, poiOffset)
-		  && (poiOffset & 0x3FFFFF)))
+		if (!(_poiSize >= offset * _poiMultiplier
+		  && seek(hdl, _poiOffset + offset * _poiMultiplier)
+		  && readUInt24(hdl, poiOffset) && (poiOffset & 0x3FFFFF)))
 			return QString();
 		labelOffset = _offset + (poiOffset & 0x3FFFFF) * _multiplier;
 	} else

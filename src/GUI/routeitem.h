@@ -5,6 +5,7 @@
 #include "pathitem.h"
 #include "units.h"
 #include "format.h"
+#include "graphicsscene.h"
 
 class Map;
 class WaypointItem;
@@ -23,11 +24,12 @@ public:
 	void showWaypoints(bool show);
 	void showWaypointLabels(bool show);
 
-private:
-	QString toolTip(Units units) const;
+	QString info() const;
 
+private:
 	QString _name;
 	QString _desc;
+	QVector<Link> _links;
 	CoordinatesFormat _coordinatesFormat;
 
 	QVector<WaypointItem*> _waypoints;
