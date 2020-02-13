@@ -5,7 +5,6 @@
 #include <QGraphicsSimpleTextItem>
 #include <QPalette>
 #include <QLocale>
-#include <QScrollBar>
 #include "data/graph.h"
 #include "opengl.h"
 #include "axisitem.h"
@@ -57,7 +56,6 @@ GraphView::GraphView(QWidget *parent)
 	_xScale = 1;
 	_yScale = 1;
 	_yOffset = 0;
-	_xZoom = 1;
 
 	_precision = 0;
 	_minYRange = 0.01;

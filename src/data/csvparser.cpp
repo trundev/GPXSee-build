@@ -1,3 +1,5 @@
+#include <QImageReader>
+#include <QFileInfo>
 #include <QStringList>
 #include "csv.h"
 #include "csvparser.h"
@@ -259,7 +261,7 @@ bool CSVParser::parse_wheellog(QFile *file, QList<TrackData> &tracks,
 #if 1	//Experimental: Add icons
 				static ImageInfo poiIcon(SHOW_POI_ICON, QImageReader(SHOW_POI_ICON).size());
 				static ImageInfo alertIcon(CLOSE_FILE_ICON, QImageReader(CLOSE_FILE_ICON).size());
-				waypoint.setImage(evdata.hasAlert() ?  alertIcon : poiIcon);
+				waypoint.addImage(evdata.hasAlert() ?  alertIcon : poiIcon);
 #endif
 				waypoints.append(waypoint);
 			}

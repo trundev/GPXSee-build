@@ -40,7 +40,7 @@ EVGraph::EVGraph(QWidget *parent) : GraphTab(parent)
 
 		bool checked = true;
 		// Initially remove some of the parameters that are too big (fix incorrect scalling)....
-		switch ((EVData::scalar_t)id)
+		switch (scalarId)
 		{
 		case EVData::t_distance: case EVData::t_totaldistance:
 			checked = false;
@@ -77,6 +77,8 @@ EVGraph::~EVGraph()
 	settings.endGroup();
 	_evShowActions.clear();
 #endif // QT_NO_CONTEXTMENU
+
+	qDeleteAll(_tracks);
 }
 
 void EVGraph::setInfo()
@@ -84,7 +86,7 @@ void EVGraph::setInfo()
 	if (_showTracks) {
 		QLocale l(QLocale::system());
 
-		GraphTab::addInfo(tr("Graph number"), l.toString(_graphs.size()));
+		GraphTab::addInfo(tr("Graph number"), l.toString(_tracks.size()));
 	} else
 		clearInfo();
 }
@@ -112,10 +114,15 @@ QList<GraphItem*> EVGraph::loadData(const Data &data)
 
 			const Graph &graph = track.evScalar(scalarId);
 			if (graph.isValid()) {
-				EVGraphItem *gi = new EVGraphItem(graph, _graphType);
+				EVGraphItem *gi = new EVGraphItem(graph, _graphType,
+				  _width, _palette.nextColor());
 				gi->setScalarId(scalarId);
+				gi->setUnits(_units);
 
-				GraphTab::addGraph(gi, id);
+				_tracks.append(gi);
+				if (_showTracks)
+					addGraph(gi);
+
 				graphs.append(gi);
 				hasGraph = true;
 
@@ -123,25 +130,26 @@ QList<GraphItem*> EVGraph::loadData(const Data &data)
 				QAction *a = findAction(_evShowActions, id);
 				if (a) {
 					a->setDisabled(false);
-					showGraph(a->isChecked(), id);
+					if (!a->isChecked())
+						removeGraph(gi);
 				}
 #endif // QT_NO_CONTEXTMENU
 			}
 		}
 
 		if (!hasGraph) {
-			skipColor();
+			_palette.nextColor();
 			graphs.append(0);
 		}
 	}
 
 	for (int i = 0; i < data.routes().count(); i++) {
-		skipColor();
+		_palette.nextColor();
 		graphs.append(0);
 	}
 
 	for (int i = 0; i < data.areas().count(); i++)
-		skipColor();
+		_palette.nextColor();
 
 	setInfo();
 	redraw();
@@ -151,6 +159,9 @@ QList<GraphItem*> EVGraph::loadData(const Data &data)
 
 void EVGraph::clear()
 {
+	qDeleteAll(_tracks);
+	_tracks.clear();
+
 	GraphTab::clear();
 }
 
@@ -163,7 +174,13 @@ void EVGraph::showTracks(bool show)
 {
 	_showTracks = show;
 
-	showGraph(show);
+	for (int i = 0; i < _tracks.size(); i++) {
+		if (show)
+			addGraph(_tracks.at(i));
+		else
+			removeGraph(_tracks.at(i));
+	}
+
 	setInfo();
 
 	redraw();
@@ -176,13 +193,13 @@ void EVGraph::contextMenuEvent(QContextMenuEvent *event)
 
 	// Find the the uppermost GraphItem --
 	// the smallest index returned by QGraphicsView::items()
-	const GraphItem *gi = NULL;
+	const EVGraphItem *gi = NULL;
 	for (int idx = 0; idx < view_items.size(); idx++) {
 		QGraphicsObject *go = view_items[idx]->toGraphicsObject();
 		if (go) {
-			int i = _graphs.indexOf((GraphItem*)go);
+			int i = _tracks.indexOf((EVGraphItem*)go);
 			if (i >= 0) {
-				gi = _graphs[i];
+				gi = _tracks[i];
 				break;
 			}
 		}
@@ -190,7 +207,7 @@ void EVGraph::contextMenuEvent(QContextMenuEvent *event)
 
 	if (gi) {
 		// Clicked on an EV graph, show modified menu
-		EVData::scalar_t scalarId = (EVData::scalar_t)gi->id();
+		EVData::scalar_t scalarId = gi->getScalarId();
 
 		QAction *a = new QAction(tr("Show only ") + tr(EVData::getUserName(scalarId)), this);
 		a->setMenuRole(QAction::NoRole);
@@ -218,7 +235,11 @@ void EVGraph::showEVData(bool show)
 	if (act == NULL)
 		return;
 
-	showGraph(show, act->data().toInt());
+	EVGraphItem *gi = _tracks.at(act->data().toInt());
+	if (show)
+		addGraph(gi);
+	else
+		removeGraph(gi);
 	redraw();
 }
 
@@ -234,7 +255,8 @@ void EVGraph::showSingleEVData()
 			QAction *a = findAction(_evShowActions, idx);
 			if (a) {
 				a->setChecked(false);
-				showGraph(false, idx);
+				EVGraphItem *gi = _tracks.at(idx);
+				removeGraph(gi);
 			}
 		}
 

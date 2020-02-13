@@ -4,6 +4,8 @@
 #include <QMenu>
 #include "graphtab.h"
 
+class EVGraphItem;
+
 class EVGraph : public GraphTab
 {
 	Q_OBJECT
@@ -32,6 +34,7 @@ private:
 	void setInfo();
 
 	bool _showTracks;
+	QList<EVGraphItem *> _tracks;
 };
 
 #endif // EVGRAPH_H
