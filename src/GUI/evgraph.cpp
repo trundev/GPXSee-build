@@ -195,13 +195,10 @@ void EVGraph::contextMenuEvent(QContextMenuEvent *event)
 	// the smallest index returned by QGraphicsView::items()
 	const EVGraphItem *gi = NULL;
 	for (int idx = 0; idx < view_items.size(); idx++) {
-		QGraphicsObject *go = view_items[idx]->toGraphicsObject();
-		if (go) {
-			int i = _tracks.indexOf((EVGraphItem*)go);
-			if (i >= 0) {
-				gi = _tracks[i];
-				break;
-			}
+		int i = _tracks.indexOf(static_cast<EVGraphItem*>(view_items[idx]));
+		if (i >= 0) {
+			gi = _tracks[i];
+			break;
 		}
 	}
 
