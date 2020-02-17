@@ -8,51 +8,56 @@
 #include "mbtilesmap.h"
 #include "rmap.h"
 #include "imgmap.h"
+#include "IMG/gmap.h"
 #include "maplist.h"
 
 
-bool MapList::loadMap(Map* map, const QString &path, bool dir)
+bool MapList::loadMap(Map *map, const QString &path)
 {
-	if (map->isValid()) {
+	if (map && map->isValid()) {
 		_maps.append(map);
 		return true;
+	} else if (map) {
+		_errorPath = path;
+		_errorString = map->errorString();
+		return false;
 	} else {
-		if (dir)
-			_errorString += path + ": " + map->errorString() + "\n";
-		else
-			_errorString = map->errorString();
+		_errorString = path;
+		_errorString = "Unknown file format";
 		return false;
 	}
 }
 
-Map *MapList::loadSource(const QString &path, bool dir)
+Map *MapList::loadSource(const QString &path)
 {
-	QString err;
-	Map *map = MapSource::loadMap(path, err);
+	Map *map = MapSource::loadMap(path, _errorString);
 
-	if (!map) {
-		if (dir)
-			_errorString += path + ": " + err + "\n";
-		else
-			_errorString = err;
-	} else
+	if (!map)
+		_errorPath = path;
+	else
 		map->setParent(this);
 
 	return map;
 }
 
-bool MapList::loadFile(const QString &path, bool *atlas, bool dir)
+bool MapList::loadFile(const QString &path, bool *terminate)
 {
 	QFileInfo fi(path);
 	QString suffix = fi.suffix().toLower();
-	Map *map;
+	Map *map = 0;
 
 	if (Atlas::isAtlas(path)) {
-		*atlas = true;
+		if (terminate)
+			*terminate = true;
 		map = new Atlas(path, this);
 	} else if (suffix == "xml") {
-		if (!(map = loadSource(path, dir)))
+		if (MapSource::isMap(path) && !(map = loadSource(path)))
 			return false;
+		else if (GMAP::isGMAP(path)) {
+			if (terminate)
+				*terminate = true;
+			map = new IMGMap(path);
+		}
 	} else if (suffix == "jnx")
 		map = new JNXMap(path, this);
 	else if (suffix == "tif" || suffix == "tiff")
@@ -63,10 +68,10 @@ bool MapList::loadFile(const QString &path, bool *atlas, bool dir)
 		map = new RMap(path, this);
 	else if (suffix == "img")
 		map = new IMGMap(path, this);
-	else
+	else if (suffix == "map" || suffix == "tar")
 		map = new OziMap(path, this);
 
-	if (!loadMap(map, path, dir)) {
+	if (!loadMap(map, path)) {
 		delete map;
 		return false;
 	}
@@ -74,7 +79,7 @@ bool MapList::loadFile(const QString &path, bool *atlas, bool dir)
 	return true;
 }
 
-bool MapList::loadDirR(const QString &path)
+bool MapList::loadDir(const QString &path)
 {
 	QDir md(path);
 	md.setFilter(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
@@ -85,15 +90,15 @@ bool MapList::loadDirR(const QString &path)
 	for (int i = 0; i < ml.size(); i++) {
 		const QFileInfo &fi = ml.at(i);
 		QString suffix = fi.suffix().toLower();
-		bool atlas = false;
+		bool terminate = false;
 
 		if (fi.isDir() && fi.fileName() != "set") {
-			if (!loadDirR(fi.absoluteFilePath()))
+			if (!loadDir(fi.absoluteFilePath()))
 				ret = false;
 		} else if (filter().contains("*." + suffix)) {
-			if (!loadFile(fi.absoluteFilePath(), &atlas, true))
+			if (!loadFile(fi.absoluteFilePath(), &terminate))
 				ret = false;
-			if (atlas)
+			if (terminate)
 				break;
 		}
 	}
@@ -101,26 +106,11 @@ bool MapList::loadDirR(const QString &path)
 	return ret;
 }
 
-bool MapList::loadFile(const QString &path)
-{
-	bool atlas;
-
-	_errorString.clear();
-	return loadFile(path, &atlas, false);
-}
-
-bool MapList::loadDir(const QString &path)
-{
-	_errorString.clear();
-	return loadDirR(path);
-}
-
 QString MapList::formats()
 {
 	return
-	  tr("Supported files")
-	  + " (*.img *.jnx *.map *.mbtiles *.rmap *.rtmap *.tar *.tba *.tif *.tiff *.xml);;"
-	  + tr("Garmin IMG maps") + " (*.img);;"
+	  tr("Supported files") + " (" + filter().join(" ") + ");;"
+	  + tr("Garmin IMG maps") + " (*.gmap *.gmapi *.img *.xml);;"
 	  + tr("Garmin JNX maps") + " (*.jnx);;"
 	  + tr("OziExplorer maps") + " (*.map);;"
 	  + tr("MBTiles maps") + " (*.mbtiles);;"
@@ -133,7 +123,8 @@ QString MapList::formats()
 QStringList MapList::filter()
 {
 	QStringList filter;
-	filter << "*.img" << "*.jnx" << "*.map" << "*.tba" << "*.tar" << "*.xml"
-	  << "*.tif" << "*.tiff" << "*.mbtiles" << "*.rmap" << "*.rtmap" << "*.img";
+	filter << "*.gmap" << "*.gmapi" << "*.img" << "*.jnx" << "*.map"
+	  << "*.mbtiles" << "*.rmap" << "*.rtmap" << "*.tar" << "*.tba" << "*.tif"
+	  << "*.tiff"  << "*.xml";
 	return filter;
 }

@@ -4,12 +4,12 @@
 
 
 HeartRateGraphItem::HeartRateGraphItem(const Graph &graph, GraphType type,
-  QGraphicsItem *parent) : GraphItem(graph, type, parent)
+  int width, const QColor &color, QGraphicsItem *parent)
+  : GraphItem(graph, type, width, color, parent)
 {
-	setToolTip(toolTip());
 }
 
-QString HeartRateGraphItem::toolTip() const
+QString HeartRateGraphItem::info() const
 {
 	ToolTip tt;
 	QLocale l(QLocale::system());

@@ -5,16 +5,17 @@
 
 
 EVGraphItem::EVGraphItem(const Graph &graph, GraphType type,
-  QGraphicsItem *parent) : GraphItem(graph, type, parent), _scalarId(-1)
+  int width, const QColor &color,QGraphicsItem *parent)
+  : GraphItem(graph, type, width, color, parent), _scalarId((EVData::scalar_t)-1)
 {
 }
 
-void EVGraphItem::setScalarId(int id)
+void EVGraphItem::setScalarId(EVData::scalar_t id)
 {
 	_scalarId = id;
-	_paramName = tr(EVData::getUserName((EVData::scalar_t)id));
+	_paramName = tr(EVData::getUserName(id));
 
-	switch ((EVData::scalar_t)id)
+	switch (id)
 	{
 	// Main parameters (speed, electrical)
 	case EVData::t_speed:
@@ -60,11 +61,9 @@ void EVGraphItem::setScalarId(int id)
 		_unitsSuffix = tr("?");
 		break;
 	}
-
-	setToolTip(toolTip());
 }
 
-QString EVGraphItem::toolTip() const
+QString EVGraphItem::info() const
 {
 	ToolTip tt;
 	QLocale l(QLocale::system());

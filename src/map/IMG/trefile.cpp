@@ -1,9 +1,9 @@
+#include "common/garmin.h"
 #include "subdiv.h"
-#include "units.h"
 #include "trefile.h"
 
 
-static void unlock(quint8 *dst, const quint8 *src, quint32 size, quint32 key)
+static void demangle(quint8 *data, quint32 size, quint32 key)
 {
 	static const unsigned char shuf[] = {
 		0xb, 0xc, 0xa, 0x0,
@@ -15,8 +15,8 @@ static void unlock(quint8 *dst, const quint8 *src, quint32 size, quint32 key)
 	int sum = shuf[((key >> 24) + (key >> 16) + (key >> 8) + key) & 0xf];
 
 	for (quint32 i = 0, ringctr = 16; i < size; i++) {
-		quint32 upper = src[i] >> 4;
-		quint32 lower = src[i];
+		quint32 upper = data[i] >> 4;
+		quint32 lower = data[i];
 
 		upper -= sum;
 		upper -= key >> ringctr;
@@ -28,7 +28,7 @@ static void unlock(quint8 *dst, const quint8 *src, quint32 size, quint32 key)
 		lower -= shuf[(key >> ringctr) & 0xf];
 		ringctr = ringctr ? ringctr - 4 : 16;
 
-		dst[i] = ((upper << 4) & 0xf0) | (lower & 0xf);
+		data[i] = ((upper << 4) & 0xf0) | (lower & 0xf);
 	}
 }
 
@@ -37,36 +37,39 @@ TREFile::~TREFile()
 	clear();
 }
 
-bool TREFile::init()
+bool TREFile::init(bool baseMap)
 {
-	Handle hdl;
+	Handle hdl(this);
 	quint8 locked;
 	quint16 hdrLen;
 
-	if (!(seek(hdl, 0) && readUInt16(hdl, hdrLen)
-	  && seek(hdl, 0x0D) && readByte(hdl, locked)))
+	if (!(seek(hdl, _gmpOffset) && readUInt16(hdl, hdrLen)
+	  && seek(hdl, _gmpOffset + 0x0D) && readUInt8(hdl, locked)))
 		return false;
 
 	// Tile bounds
 	qint32 north, east, south, west;
-	if (!(seek(hdl, 0x15) && readInt24(hdl, north) && readInt24(hdl, east)
-	  && readInt24(hdl, south) && readInt24(hdl, west)))
+	if (!(seek(hdl, _gmpOffset + 0x15) && readInt24(hdl, north)
+	  && readInt24(hdl, east) && readInt24(hdl, south) && readInt24(hdl, west)))
 		return false;
-	_bounds = RectC(Coordinates(toWGS84(west), toWGS84(north)),
-	  Coordinates(toWGS84(east), toWGS84(south)));
+	_bounds = RectC(Coordinates(toWGS24(west), toWGS24(north)),
+	  Coordinates(toWGS24(east), toWGS24(south)));
 
 	// Levels & subdivs info
 	quint32 levelsOffset, levelsSize, subdivSize;
-	if (!(seek(hdl, 0x21) && readUInt32(hdl, levelsOffset)
+	if (!(seek(hdl, _gmpOffset + 0x21) && readUInt32(hdl, levelsOffset)
 	  && readUInt32(hdl, levelsSize) && readUInt32(hdl, _subdivOffset)
 	  && readUInt32(hdl, subdivSize)))
 		return false;
 
-	// TRE7 info
 	if (hdrLen > 0x9A) {
-		if (!(seek(hdl, 0x7C) && readUInt32(hdl, _extended.offset)
+		// TRE7 info
+		if (!(seek(hdl, _gmpOffset + 0x7C) && readUInt32(hdl, _extended.offset)
 		  && readUInt32(hdl, _extended.size)
 		  && readUInt16(hdl, _extended.itemSize)))
+			return false;
+		// flags
+		if (!(seek(hdl, _gmpOffset + 0x86) && readUInt32(hdl, _flags)))
 			return false;
 	}
 
@@ -75,15 +78,13 @@ bool TREFile::init()
 		return false;
 	quint8 levels[64];
 	for (quint32 i = 0; i < levelsSize; i++)
-		if (!readByte(hdl, levels[i]))
+		if (!readUInt8(hdl, levels[i]))
 			return false;
 	if (locked) {
 		quint32 key;
-		quint8 unlocked[64];
-		if (!seek(hdl, 0xAA) || !readUInt32(hdl, key))
+		if (!seek(hdl, _gmpOffset + 0xAA) || !readUInt32(hdl, key))
 			return false;
-		unlock(unlocked, levels, levelsSize, key);
-		memcpy(levels, unlocked, levelsSize);
+		demangle(levels, levelsSize, key);
 	}
 
 	quint32 levelsCount = levelsSize / 4;
@@ -107,12 +108,14 @@ bool TREFile::init()
 		}
 	}
 
+	_isBaseMap = baseMap;
+
 	return (_firstLevel >= 0);
 }
 
 bool TREFile::load(int idx)
 {
-	Handle hdl;
+	Handle hdl(this);
 	QList<SubDiv*> sl;
 	SubDiv *s = 0;
 	SubDivTree *tree = new SubDivTree();
@@ -128,15 +131,16 @@ bool TREFile::load(int idx)
 		return false;
 
 	for (int j = 0; j < _levels.at(idx).subdivs; j++) {
-		quint32 offset;
+		quint32 oo;
 		qint32 lon, lat;
-		quint8 objects;
 		quint16 width, height, nextLevel;
 
-		if (!(readUInt24(hdl, offset) && readByte(hdl, objects)
-		  && readInt24(hdl, lon) && readInt24(hdl, lat)
+		if (!(readUInt32(hdl, oo) && readInt24(hdl, lon) && readInt24(hdl, lat)
 		  && readUInt16(hdl, width) && readUInt16(hdl, height)))
 			goto error;
+		quint32 offset = oo & 0xfffffff;
+		quint8 objects = (((qint16)height < 0) << 4) | (oo >> 0x1c);
+
 		if (idx != _levels.size() - 1)
 			if (!readUInt16(hdl, nextLevel))
 				goto error;
@@ -148,13 +152,14 @@ bool TREFile::load(int idx)
 		width <<= (24 - _levels.at(idx).bits);
 		height <<= (24 - _levels.at(idx).bits);
 
+
 		s = new SubDiv(offset, lon, lat, _levels.at(idx).bits, objects);
 		sl.append(s);
 
 		double min[2], max[2];
-		RectC bounds(Coordinates(toWGS84(lon - width),
-		  toWGS84(lat + height + 1)), Coordinates(toWGS84(lon + width + 1),
-		  toWGS84(lat - height)));
+		RectC bounds(Coordinates(toWGS24(lon - width),
+		  toWGS24(lat + height + 1)), Coordinates(toWGS24(lon + width + 1),
+		  toWGS24(lat - height)));
 
 		min[0] = bounds.left();
 		min[1] = bounds.bottom();
@@ -196,7 +201,7 @@ bool TREFile::load(int idx)
 			if (i)
 				sl.at(i-1)->setExtEnds(polygons, lines, points);
 
-			if (!seek(hdl, hdl.pos + _extended.itemSize - 12))
+			if (!seek(hdl, hdl.pos() + _extended.itemSize - 12))
 				goto error;
 		}
 
@@ -233,9 +238,16 @@ void TREFile::clear()
 	_subdivs.clear();
 }
 
-int TREFile::level(int bits)
+int TREFile::level(int bits, bool baseMap)
 {
 	int idx = _firstLevel;
+
+	if (baseMap) {
+		if (!_isBaseMap && _levels.at(idx).bits > bits)
+			return -1;
+		if (_isBaseMap && bits > _levels.last().bits)
+			return -1;
+	}
 
 	for (int i = idx + 1; i < _levels.size(); i++) {
 		if (_levels.at(i).bits > bits)
@@ -256,10 +268,10 @@ static bool cb(SubDiv *subdiv, void *context)
 	return true;
 }
 
-QList<SubDiv*> TREFile::subdivs(const RectC &rect, int bits)
+QList<SubDiv*> TREFile::subdivs(const RectC &rect, int bits, bool baseMap)
 {
 	QList<SubDiv*> list;
-	SubDivTree *tree = _subdivs.value(level(bits));
+	SubDivTree *tree = _subdivs.value(level(bits, baseMap));
 	double min[2], max[2];
 
 	min[0] = rect.left();

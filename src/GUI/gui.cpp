@@ -113,7 +113,7 @@ void GUI::loadMaps()
 	QString mapDir(ProgramPaths::mapDir());
 
 	if (!mapDir.isNull() && !_ml->loadDir(mapDir))
-		qWarning("%s", qPrintable(_ml->errorString()));
+		qWarning("%s", qPrintable(_ml->errorPath() + ": " + _ml->errorString()));
 
 	_map = new EmptyMap(this);
 }
@@ -452,11 +452,11 @@ void GUI::createActions()
 	_degreesMinutesAction->setActionGroup(ag);
 	connect(_degreesMinutesAction, SIGNAL(triggered()), this,
 	  SLOT(setDegreesMinutes()));
-	_DMSAction = new QAction(tr("Degrees, minutes, seconds (DMS)"), this);
-	_DMSAction->setMenuRole(QAction::NoRole);
-	_DMSAction->setCheckable(true);
-	_DMSAction->setActionGroup(ag);
-	connect(_DMSAction, SIGNAL(triggered()), this, SLOT(setDMS()));
+	_dmsAction = new QAction(tr("Degrees, minutes, seconds (DMS)"), this);
+	_dmsAction->setMenuRole(QAction::NoRole);
+	_dmsAction->setCheckable(true);
+	_dmsAction->setActionGroup(ag);
+	connect(_dmsAction, SIGNAL(triggered()), this, SLOT(setDMS()));
 	_fullscreenAction = new QAction(QIcon(FULLSCREEN_ICON),
 	  tr("Fullscreen mode"), this);
 	_fullscreenAction->setMenuRole(QAction::NoRole);
@@ -560,7 +560,7 @@ void GUI::createMenus()
 	QMenu *coordinatesMenu = settingsMenu->addMenu(tr("Coordinates format"));
 	coordinatesMenu->addAction(_decimalDegreesAction);
 	coordinatesMenu->addAction(_degreesMinutesAction);
-	coordinatesMenu->addAction(_DMSAction);
+	coordinatesMenu->addAction(_dmsAction);
 	settingsMenu->addSeparator();
 	settingsMenu->addAction(_showToolbarsAction);
 	settingsMenu->addAction(_fullscreenAction);
@@ -951,6 +951,7 @@ void GUI::openOptions()
 	SET_TRACK_OPTION(cadenceFilter, setCadenceFilter);
 	SET_TRACK_OPTION(powerFilter, setPowerFilter);
 	SET_TRACK_OPTION(outlierEliminate, setOutlierElimination);
+	SET_TRACK_OPTION(automaticPause, setAutomaticPause);
 	SET_TRACK_OPTION(pauseSpeed, setPauseSpeed);
 	SET_TRACK_OPTION(pauseInterval, setPauseInterval);
 	SET_TRACK_OPTION(useReportedSpeed, useReportedSpeed);
@@ -1068,7 +1069,7 @@ void GUI::statistics()
 
 		text.append("<tr><th colspan=\"2\">" + tab->label() + "</th></tr>");
 		for (int j = 0; j < tab->info().size(); j++) {
-			const KV &kv = tab->info().at(j);
+			const KV<QString, QString> &kv = tab->info().at(j);
 			text.append("<tr><td>" + kv.key() + ":</td><td>" + kv.value()
 			  + "</td></tr>");
 		}
@@ -1326,7 +1327,10 @@ bool GUI::loadMap(const QString &fileName)
 	if (fileName.isEmpty())
 		return false;
 
-	if (_ml->loadFile(fileName)) {
+	QFileInfo fi(fileName);
+	bool res = fi.isDir() ? _ml->loadDir(fileName) : _ml->loadFile(fileName);
+
+	if (res) {
 		QAction *a = createMapAction(_ml->maps().last());
 		_mapMenu->insertAction(_mapsEnd, a);
 		_showMapAction->setEnabled(true);
@@ -1582,7 +1586,6 @@ void GUI::keyPressEvent(QKeyEvent *event)
 			else
 				_movingTimeAction->trigger();
 			break;
-
 		case Qt::Key_Escape:
 			if (_fullscreenAction->isChecked()) {
 				_fullscreenAction->setChecked(false);
@@ -1657,7 +1660,7 @@ void GUI::writeSettings()
 	  : _nauticalUnitsAction->isChecked() ? Nautical : Metric;
 	if (units != UNITS_DEFAULT)
 		settings.setValue(UNITS_SETTING, units);
-	CoordinatesFormat format = _DMSAction->isChecked() ? DMS
+	CoordinatesFormat format = _dmsAction->isChecked() ? DMS
 	  : _degreesMinutesAction->isChecked() ? DegreesMinutes : DecimalDegrees;
 	if (format != COORDINATES_DEFAULT)
 		settings.setValue(COORDINATES_SETTING, format);
@@ -1801,6 +1804,8 @@ void GUI::writeSettings()
 		settings.setValue(POWER_FILTER_SETTING, _options.powerFilter);
 	if (_options.outlierEliminate != OUTLIER_ELIMINATE_DEFAULT)
 		settings.setValue(OUTLIER_ELIMINATE_SETTING, _options.outlierEliminate);
+	if (_options.automaticPause != AUTOMATIC_PAUSE_DEFAULT)
+		settings.setValue(AUTOMATIC_PAUSE_SETTING, _options.automaticPause);
 	if (_options.pauseSpeed != PAUSE_SPEED_DEFAULT)
 		settings.setValue(PAUSE_SPEED_SETTING, _options.pauseSpeed);
 	if (_options.pauseInterval != PAUSE_INTERVAL_DEFAULT)
@@ -1879,7 +1884,7 @@ void GUI::readSettings()
 
 	value = settings.value(COORDINATES_SETTING, COORDINATES_DEFAULT).toInt();
 	if (value == DMS)
-		_DMSAction->trigger();
+		_dmsAction->trigger();
 	else if (value == DegreesMinutes)
 		_degreesMinutesAction->trigger();
 	else
@@ -2075,6 +2080,8 @@ void GUI::readSettings()
 	  USE_REPORTED_SPEED_DEFAULT).toBool();
 	_options.dataUseDEM = settings.value(DATA_USE_DEM_SETTING,
 	  DATA_USE_DEM_DEFAULT).toBool();
+	_options.automaticPause = settings.value(AUTOMATIC_PAUSE_SETTING,
+	  AUTOMATIC_PAUSE_DEFAULT).toBool();
 	_options.pauseInterval = settings.value(PAUSE_INTERVAL_SETTING,
 	  PAUSE_INTERVAL_DEFAULT).toInt();
 	_options.poiRadius = settings.value(POI_RADIUS_SETTING, POI_RADIUS_DEFAULT)
@@ -2156,6 +2163,7 @@ void GUI::readSettings()
 	Track::setCadenceFilter(_options.cadenceFilter);
 	Track::setPowerFilter(_options.powerFilter);
 	Track::setOutlierElimination(_options.outlierEliminate);
+	Track::setAutomaticPause(_options.automaticPause);
 	Track::setPauseSpeed(_options.pauseSpeed);
 	Track::setPauseInterval(_options.pauseInterval);
 	Track::useReportedSpeed(_options.useReportedSpeed);

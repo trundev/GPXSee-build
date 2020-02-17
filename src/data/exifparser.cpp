@@ -82,7 +82,10 @@ double EXIFParser::altitude(TIFFFile &file, const IFDEntry &alt,
 
 double EXIFParser::coordinate(TIFFFile &file, const IFDEntry &ll) const
 {
-	if (!(ll.type == TIFF_RATIONAL && ll.count == 3))
+	// Some broken image creators like NOKIA phones use a wrong (SRATIONAL)
+	// data type
+	if (!((ll.type == TIFF_RATIONAL || ll.type == TIFF_SRATIONAL)
+	  && ll.count == 3))
 		return NAN;
 
 	if (!file.seek(ll.offset))
@@ -113,9 +116,12 @@ Coordinates EXIFParser::coordinates(TIFFFile &file, const IFDEntry &lon,
 	if (!c.isValid())
 		return Coordinates();
 
-	if (lonRef.offset == 'W')
+	char ew = file.isBE() ? lonRef.offset >> 24 : lonRef.offset;
+	char ns = file.isBE() ? latRef.offset >> 24 : latRef.offset;
+
+	if (ew == 'W')
 		c.rlon() = -c.lon();
-	if (latRef.offset == 'S')
+	if (ns == 'S')
 		c.rlat() = -c.lat();
 
 	return c;
@@ -206,7 +212,7 @@ bool EXIFParser::parseTIFF(QFile *file, QVector<Waypoint> &waypoints)
 
 	Waypoint wp(c);
 	wp.setName(QFileInfo(file->fileName()).baseName());
-	wp.setImage(img);
+	wp.addImage(img);
 	wp.setElevation(altitude(tiff, GPSIFD.value(GPSAltitude),
 	  GPSIFD.value(GPSAltitudeRef)));
 	wp.setTimestamp(QDateTime(QDate::fromString(text(tiff,

@@ -1,72 +1,69 @@
 #include <QImage>
 #include "style.h"
 
-#define TYPE(t) ((t)<<8)
 
 void Style::defaultPolygonStyle()
 {
-	_polygons[TYPE(0x01)] = Style::Polygon(QBrush("#dfd3b5"));
-	_polygons[TYPE(0x02)] = Style::Polygon(QBrush("#dfd3b5"));
-	_polygons[TYPE(0x03)] = Style::Polygon(QBrush("#dfd3b5"));
-	_polygons[TYPE(0x04)] = Style::Polygon(QBrush("#ff4040", Qt::BDiagPattern));
-	_polygons[TYPE(0x05)] = Style::Polygon(QBrush("#d6d4ce"));
-	_polygons[TYPE(0x06)] = Style::Polygon(QBrush("#d6d4ce"));
-	_polygons[TYPE(0x07)] = Style::Polygon(QBrush("#d6d4ce"));
-	_polygons[TYPE(0x08)] = Style::Polygon(QBrush("#d6d4ce"));
-	_polygons[TYPE(0x09)] = Style::Polygon(QBrush("#d6d4ce"));
-	_polygons[TYPE(0x0a)] = Style::Polygon(QBrush("#d6d4ce"));
-	_polygons[TYPE(0x0b)] = Style::Polygon(QBrush("#d6d4ce"));
-	_polygons[TYPE(0x0c)] = Style::Polygon(QBrush("#d6d4ce"));
-	_polygons[TYPE(0x0d)] = Style::Polygon(QBrush("#f8e3be"));
-	_polygons[TYPE(0x0e)] = Style::Polygon(QBrush("#ffffff"));
-	_polygons[TYPE(0x0f)] = Style::Polygon(QBrush("#e6e2d9"));
-	_polygons[TYPE(0x10)] = Style::Polygon(QBrush("#e6e2d9"));
-	_polygons[TYPE(0x11)] = Style::Polygon(QBrush("#e6e2d9"));
-	_polygons[TYPE(0x12)] = Style::Polygon(QBrush("#e6e2d9"));
-	_polygons[TYPE(0x13)] = Style::Polygon(QBrush("#dbd0b6"),
+	_polygons[TYPE(0x01)] = Polygon(QBrush("#dfd3b5"));
+	_polygons[TYPE(0x02)] = Polygon(QBrush("#dfd3b5"));
+	_polygons[TYPE(0x03)] = Polygon(QBrush("#dfd3b5"));
+	_polygons[TYPE(0x04)] = Polygon(QBrush("#ff4040", Qt::BDiagPattern));
+	_polygons[TYPE(0x05)] = Polygon(QBrush("#d6d4ce"));
+	_polygons[TYPE(0x06)] = Polygon(QBrush("#d6d4ce"));
+	_polygons[TYPE(0x07)] = Polygon(QBrush("#d6d4ce"));
+	_polygons[TYPE(0x08)] = Polygon(QBrush("#d6d4ce"));
+	_polygons[TYPE(0x09)] = Polygon(QBrush("#d6d4ce"));
+	_polygons[TYPE(0x0a)] = Polygon(QBrush("#d6d4ce"));
+	_polygons[TYPE(0x0b)] = Polygon(QBrush("#d6d4ce"));
+	_polygons[TYPE(0x0c)] = Polygon(QBrush("#d6d4ce"));
+	_polygons[TYPE(0x0d)] = Polygon(QBrush("#f8e3be"));
+	_polygons[TYPE(0x0e)] = Polygon(QBrush("#ffffff"));
+	_polygons[TYPE(0x0f)] = Polygon(QBrush("#e6e2d9"));
+	_polygons[TYPE(0x10)] = Polygon(QBrush("#e6e2d9"));
+	_polygons[TYPE(0x11)] = Polygon(QBrush("#e6e2d9"));
+	_polygons[TYPE(0x12)] = Polygon(QBrush("#e6e2d9"));
+	_polygons[TYPE(0x13)] = Polygon(QBrush("#dbd0b6"),
 	  QPen(QColor("#cdccc4"), 1));
-	_polygons[TYPE(0x14)] = Style::Polygon(QBrush(QColor("#9ac269"),
+	_polygons[TYPE(0x14)] = Polygon(QBrush("#d4ebb8"));
+	_polygons[TYPE(0x15)] = Polygon(QBrush("#d4ebb8"));
+	_polygons[TYPE(0x16)] = Polygon(QBrush(QColor("#9ac269"),
 	  Qt::BDiagPattern));
-	_polygons[TYPE(0x15)] = Style::Polygon(QBrush(QColor("#9ac269"),
-	  Qt::BDiagPattern));
-	_polygons[TYPE(0x16)] = Style::Polygon(QBrush(QColor("#9ac269"),
-	  Qt::BDiagPattern));
-	_polygons[TYPE(0x17)] = Style::Polygon(QBrush("#d4ebb8"));
-	_polygons[TYPE(0x18)] = Style::Polygon(QBrush("#d4ebb8"));
-	_polygons[TYPE(0x19)] = Style::Polygon(QBrush("#d6d4ce"));
-	_polygons[TYPE(0x1a)] = Style::Polygon(QBrush("#000000", Qt::Dense6Pattern),
+	_polygons[TYPE(0x17)] = Polygon(QBrush("#d4ebb8"));
+	_polygons[TYPE(0x18)] = Polygon(QBrush("#d4ebb8"));
+	_polygons[TYPE(0x19)] = Polygon(QBrush("#e3edc6"), QPen("#c9d3a5"));
+	_polygons[TYPE(0x1a)] = Polygon(QBrush("#000000", Qt::Dense6Pattern),
 	  QPen(QColor("#cdccc4"), 1));
-	_polygons[TYPE(0x1e)] = Style::Polygon(QBrush(QColor("#9ac269"),
+	_polygons[TYPE(0x1e)] = Polygon(QBrush(QColor("#9ac269"),
 	  Qt::BDiagPattern));
-	_polygons[TYPE(0x1f)] = Style::Polygon(QBrush(QColor("#9ac269"),
+	_polygons[TYPE(0x1f)] = Polygon(QBrush(QColor("#9ac269"),
 	  Qt::BDiagPattern));
-	_polygons[TYPE(0x28)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x29)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x32)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x3b)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x3c)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x3d)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x3e)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x3f)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x40)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x41)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x42)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x43)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x44)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x45)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x46)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x47)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x48)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x49)] = Style::Polygon(QBrush("#9fc4e1"));
-	_polygons[TYPE(0x4b)] = Style::Polygon(QBrush("#f1f0e5"), QPen("#f1f0e5"));
-	_polygons[TYPE(0x4a)] = Style::Polygon(QBrush("#f1f0e5"), QPen("#f1f0e5"));
-	_polygons[TYPE(0x4c)] = Style::Polygon(QBrush("#9fc4e1", Qt::Dense6Pattern));
-	_polygons[TYPE(0x4d)] = Style::Polygon(QBrush("#ddf1fd"));
-	_polygons[TYPE(0x4e)] = Style::Polygon(QBrush("#e3edc1"));
-	_polygons[TYPE(0x4f)] = Style::Polygon(QBrush("#d4ebb8"));
-	_polygons[TYPE(0x50)] = Style::Polygon(QBrush("#d4ebb8"));
-	_polygons[TYPE(0x51)] = Style::Polygon(QBrush("#9fc4e1", Qt::Dense4Pattern));
-	_polygons[TYPE(0x52)] = Style::Polygon(QBrush("#d4ebb8"));
+	_polygons[TYPE(0x28)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x29)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x32)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x3b)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x3c)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x3d)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x3e)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x3f)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x40)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x41)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x42)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x43)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x44)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x45)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x46)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x47)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x48)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x49)] = Polygon(QBrush("#9fc4e1"));
+	_polygons[TYPE(0x4b)] = Polygon(QBrush("#f1f0e5"), QPen("#f1f0e5"));
+	_polygons[TYPE(0x4a)] = Polygon(QBrush("#f1f0e5"), QPen("#f1f0e5"));
+	_polygons[TYPE(0x4c)] = Polygon(QBrush("#9fc4e1", Qt::Dense6Pattern));
+	_polygons[TYPE(0x4d)] = Polygon(QBrush("#ddf1fd"));
+	_polygons[TYPE(0x4e)] = Polygon(QBrush("#e3edc1"));
+	_polygons[TYPE(0x4f)] = Polygon(QBrush("#d4ebb8"));
+	_polygons[TYPE(0x50)] = Polygon(QBrush("#d4ebb8"));
+	_polygons[TYPE(0x51)] = Polygon(QBrush("#9fc4e1", Qt::Dense4Pattern));
+	_polygons[TYPE(0x52)] = Polygon(QBrush("#d4ebb8"));
 
 	_drawOrder << TYPE(0x4b) << TYPE(0x4a) << TYPE(0x01) << TYPE(0x02)
 	  << TYPE(0x03) << TYPE(0x17) << TYPE(0x18) << TYPE(0x19) << TYPE(0x1a)
@@ -89,71 +86,69 @@ void Style::defaultLineStyle()
 	QPen rr(QColor("#717171"), 3, Qt::CustomDashLine);
 	rr.setDashPattern(pattern);
 
-	_lines[TYPE(0x01)] = Style::Line(QPen(QColor("#9bd772"), 2, Qt::SolidLine),
+	_lines[TYPE(0x01)] = Line(QPen(QColor("#9bd772"), 2, Qt::SolidLine),
 	  QPen(QColor("#72a35a"), 6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-	_lines[TYPE(0x02)] = Style::Line(QPen(QColor("#ffcc78"), 2, Qt::SolidLine),
+	_lines[TYPE(0x02)] = Line(QPen(QColor("#ffcc78"), 2, Qt::SolidLine),
 	  QPen(QColor("#e8a541"), 6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-	_lines[TYPE(0x03)] = Style::Line(QPen(QColor("#ffcc78"), 2, Qt::SolidLine),
+	_lines[TYPE(0x03)] = Line(QPen(QColor("#ffcc78"), 2, Qt::SolidLine),
 	  QPen(QColor("#e8a541"), 6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-	_lines[TYPE(0x04)] = Style::Line(QPen(QColor("#faef75"), 3, Qt::SolidLine),
+	_lines[TYPE(0x04)] = Line(QPen(QColor("#faef75"), 3, Qt::SolidLine),
 	  QPen(QColor("#dbd27b"), 5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-	_lines[TYPE(0x05)] = Style::Line(QPen(QColor("#ffffff"), 3, Qt::SolidLine),
+	_lines[TYPE(0x05)] = Line(QPen(QColor("#ffffff"), 3, Qt::SolidLine),
 	  QPen(QColor("#d5cdc0"), 5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-	_lines[TYPE(0x06)] = Style::Line(QPen(QColor("#ffffff"), 3, Qt::SolidLine),
+	_lines[TYPE(0x06)] = Line(QPen(QColor("#ffffff"), 3, Qt::SolidLine),
 	  QPen(QColor("#d5cdc0"), 5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-	_lines[TYPE(0x07)] = Style::Line(QPen(QColor("#ffffff"), 2, Qt::SolidLine),
+	_lines[TYPE(0x07)] = Line(QPen(QColor("#ffffff"), 2, Qt::SolidLine),
 	  QPen(QColor("#d5cdc0"), 4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-	_lines[TYPE(0x08)] = Style::Line(QPen(QColor("#ffcc78"), 2, Qt::SolidLine),
+	_lines[TYPE(0x08)] = Line(QPen(QColor("#ffcc78"), 2, Qt::SolidLine),
 	  QPen(QColor("#e8a541"), 6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-	_lines[TYPE(0x09)] = Style::Line(QPen(QColor("#9bd772"), 2, Qt::SolidLine),
+	_lines[TYPE(0x09)] = Line(QPen(QColor("#9bd772"), 2, Qt::SolidLine),
 	  QPen(QColor("#72a35a"), 6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-	_lines[TYPE(0x0a)] = Style::Line(QPen(QColor("#aba083"), 1, Qt::DashLine));
-	_lines[TYPE(0x0b)] = Style::Line(QPen(QColor("#ffcc78"), 2, Qt::SolidLine),
+	_lines[TYPE(0x0a)] = Line(QPen(QColor("#aba083"), 1, Qt::DashLine));
+	_lines[TYPE(0x0b)] = Line(QPen(QColor("#ffcc78"), 2, Qt::SolidLine),
 	  QPen(QColor("#e8a541"), 6, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-	_lines[TYPE(0x0c)] = Style::Line(QPen(QColor("#ffffff"), 3, Qt::SolidLine),
+	_lines[TYPE(0x0c)] = Line(QPen(QColor("#ffffff"), 3, Qt::SolidLine),
 	  QPen(QColor("#d5cdc0"), 5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-	_lines[TYPE(0x14)] = Style::Line(rr, QPen(Qt::white, 3, Qt::SolidLine,
+	_lines[TYPE(0x14)] = Line(rr, QPen(Qt::white, 3, Qt::SolidLine,
 	  Qt::RoundCap, Qt::RoundJoin));
-	_lines[TYPE(0x16)] = Style::Line(QPen(QColor("#aba083"), 1, Qt::DotLine));
-	_lines[TYPE(0x18)] = Style::Line(QPen(QColor("#9fc4e1"), 2, Qt::SolidLine));
+	_lines[TYPE(0x16)] = Line(QPen(QColor("#aba083"), 1, Qt::DotLine));
+	_lines[TYPE(0x18)] = Line(QPen(QColor("#9fc4e1"), 2, Qt::SolidLine));
 	_lines[TYPE(0x18)].setTextColor(QColor("#9fc4e1"));
-	//_lines[TYPE(0x1a)] = Style::Line(QPen(QColor("#7697b7"), 1, Qt::DashLine));
-	_lines[TYPE(0x1b)] = Style::Line(QPen(QColor("#7697b7"), 1, Qt::DashLine));
-	_lines[TYPE(0x1e)] = Style::Line(QPen(QColor("#505145"), 2, Qt::DashDotLine));
-	_lines[TYPE(0x1f)] = Style::Line(QPen(QColor("#9fc4e1"), 3, Qt::SolidLine));
+	//_lines[TYPE(0x1a)] = Line(QPen(QColor("#7697b7"), 1, Qt::DashLine));
+	_lines[TYPE(0x1b)] = Line(QPen(QColor("#7697b7"), 1, Qt::DashLine));
+	_lines[TYPE(0x1e)] = Line(QPen(QColor("#505145"), 2, Qt::DashDotLine));
+	_lines[TYPE(0x1f)] = Line(QPen(QColor("#9fc4e1"), 3, Qt::SolidLine));
 	_lines[TYPE(0x1f)].setTextColor(QColor("#9fc4e1"));
-	_lines[TYPE(0x20)] = Style::Line(QPen(QColor("#cacfc0"), 1, Qt::SolidLine));
-	_lines[TYPE(0x20)].setTextColor(QColor("#62695a"));
-	_lines[TYPE(0x20)].setTextFontSize(Style::Small);
-	_lines[TYPE(0x21)] = Style::Line(QPen(QColor("#cacfc0"), 1.5, Qt::SolidLine));
-	_lines[TYPE(0x21)].setTextColor(QColor("#62695a"));
-	_lines[TYPE(0x21)].setTextFontSize(Style::Small);
-	_lines[TYPE(0x22)] = Style::Line(QPen(QColor("#cacfc0"), 2, Qt::SolidLine));
-	_lines[TYPE(0x22)].setTextColor(QColor("#62695a"));
-	_lines[TYPE(0x22)].setTextFontSize(Style::Small);
-	_lines[TYPE(0x23)] = Style::Line(QPen(QColor("#55aaff"), 1, Qt::SolidLine));
-	_lines[TYPE(0x23)].setTextColor(QColor("#55aaff"));
-	_lines[TYPE(0x23)].setTextFontSize(Style::Small);
-	_lines[TYPE(0x24)] = Style::Line(QPen(QColor("#55aaff"), 1.5, Qt::SolidLine));
-	_lines[TYPE(0x24)].setTextColor(QColor("#55aaff"));
-	_lines[TYPE(0x24)].setTextFontSize(Style::Small);
-	_lines[TYPE(0x25)] = Style::Line(QPen(QColor("#55aaff"), 2, Qt::SolidLine));
-	_lines[TYPE(0x25)].setTextColor(QColor("#55aaff"));
-	_lines[TYPE(0x25)].setTextFontSize(Style::Small);
-	_lines[TYPE(0x26)] = Style::Line(QPen(QColor("#9fc4e1"), 2, Qt::DotLine));
-	_lines[TYPE(0x27)] = Style::Line(QPen(QColor("#ffffff"), 4, Qt::SolidLine),
+	_lines[TYPE(0x20)] = Line(QPen(QColor("#cfcfcf"), 1, Qt::SolidLine));
+	_lines[TYPE(0x20)].setTextFontSize(None);
+	_lines[TYPE(0x21)] = Line(QPen(QColor("#bfbfbf"), 1, Qt::SolidLine));
+	_lines[TYPE(0x21)].setTextColor(QColor("#666666"));
+	_lines[TYPE(0x21)].setTextFontSize(Small);
+	_lines[TYPE(0x22)] = Line(QPen(QColor("#afafaf"), 1, Qt::SolidLine));
+	_lines[TYPE(0x22)].setTextColor(QColor("#666666"));
+	_lines[TYPE(0x22)].setTextFontSize(Small);
+	_lines[TYPE(0x23)] = Line(QPen(QColor("#55aaff"), 1, Qt::SolidLine));
+	_lines[TYPE(0x23)].setTextFontSize(None);
+	_lines[TYPE(0x24)] = Line(QPen(QColor("#659aef"), 1, Qt::SolidLine));
+	_lines[TYPE(0x24)].setTextColor(QColor("#558adf"));
+	_lines[TYPE(0x24)].setTextFontSize(Small);
+	_lines[TYPE(0x25)] = Line(QPen(QColor("#558adf"), 1, Qt::SolidLine));
+	_lines[TYPE(0x25)].setTextColor(QColor("#558adf"));
+	_lines[TYPE(0x25)].setTextFontSize(Small);
+	_lines[TYPE(0x26)] = Line(QPen(QColor("#9fc4e1"), 2, Qt::DotLine));
+	_lines[TYPE(0x27)] = Line(QPen(QColor("#ffffff"), 4, Qt::SolidLine),
 	  QPen(QColor("#d5cdc0"), 5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-	//_lines[TYPE(0x28)] = Style::Line(QPen(QColor("#5a5a5a"), 1, Qt::SolidLine));
-	_lines[TYPE(0x29)] = Style::Line(QPen(QColor("#5a5a5a"), 1, Qt::SolidLine));
-	_lines[TYPE(0x29)].setTextFontSize(Style::None);
+	//_lines[TYPE(0x28)] = Line(QPen(QColor("#5a5a5a"), 1, Qt::SolidLine));
+	_lines[TYPE(0x29)] = Line(QPen(QColor("#5a5a5a"), 1, Qt::SolidLine));
+	_lines[TYPE(0x29)].setTextFontSize(None);
 }
 
 void Style::defaultPointStyle()
 {
 	// Cities
-	_points[TYPE(0x01)].setTextFontSize(Style::Large);
-	_points[TYPE(0x02)].setTextFontSize(Style::Large);
-	_points[TYPE(0x03)].setTextFontSize(Style::Large);
+	_points[TYPE(0x01)].setTextFontSize(Large);
+	_points[TYPE(0x02)].setTextFontSize(Large);
+	_points[TYPE(0x03)].setTextFontSize(Large);
 
 	// POI
 	_points[0x2a00] = Point(QImage(":/restaurant-11.png"));
@@ -294,7 +289,7 @@ static bool readBitmap(SubFile *file, SubFile::Handle &hdl, QImage &img,
 	for (int y = 0; y < img.height(); y++) {
 		for (int x = 0; x < img.width(); x += 8/bpp) {
 			quint8 color;
-			if (!file->readByte(hdl, color))
+			if (!file->readUInt8(hdl, color))
 				return false;
 
 			for (int i = 0; i < 8/bpp && x + i < img.width(); i++) {
@@ -319,8 +314,8 @@ static bool readColor(SubFile *file, SubFile::Handle &hdl, QColor &color)
 {
 	quint8 b, g, r;
 
-	if (!(file->readByte(hdl, b) && file->readByte(hdl, g)
-	  && file->readByte(hdl, r)))
+	if (!(file->readUInt8(hdl, b) && file->readUInt8(hdl, g)
+	  && file->readUInt8(hdl, r)))
 		return false;
 
 	color = qRgb(r, g, b);
@@ -333,20 +328,20 @@ static bool skipLocalization(SubFile *file, SubFile::Handle &hdl)
 	quint8 t8;
 	quint16 len;
 
-	if (!file->readByte(hdl, t8))
+	if (!file->readUInt8(hdl, t8))
 		return false;
 	len = t8;
 
 	if (len & 0x01)
 		len = len >> 1;
 	else {
-		if (!file->readByte(hdl, t8))
+		if (!file->readUInt8(hdl, t8))
 			return false;
 		len = (((quint16)t8) << 8) | len;
 		len = len >> 2;
 	}
 
-	if (!file->seek(hdl, hdl.pos + len))
+	if (!file->seek(hdl, hdl.pos() + len))
 		return false;
 
 	return true;
@@ -361,7 +356,7 @@ bool Style::itemInfo(SubFile *file, SubFile::Handle &hdl,
 
 	if (section.arrayItemSize == 5) {
 		if (!(file->readUInt16(hdl, t16_1) && file->readUInt16(hdl, t16_2)
-		  && file->readByte(hdl, t8)))
+		  && file->readUInt8(hdl, t8)))
 			return false;
 		info.offset = t16_2 | (t8<<16);
 	} else if (section.arrayItemSize == 4) {
@@ -369,7 +364,7 @@ bool Style::itemInfo(SubFile *file, SubFile::Handle &hdl,
 			return false;
 		info.offset = t16_2;
 	} else if (section.arrayItemSize == 3) {
-		if (!(file->readUInt16(hdl, t16_1) && file->readByte(hdl, t8)))
+		if (!(file->readUInt16(hdl, t16_1) && file->readUInt8(hdl, t8)))
 			return false;
 		info.offset = t8;
 	} else
@@ -400,7 +395,7 @@ bool Style::parsePolygons(SubFile *file, SubFile::Handle &hdl,
 
 		quint8 t8, flags;
 		if (!(file->seek(hdl, section.offset + info.offset)
-		  && file->readByte(hdl, t8)))
+		  && file->readUInt8(hdl, t8)))
 			return false;
 		flags = t8 & 0x0F;
 
@@ -412,14 +407,14 @@ bool Style::parsePolygons(SubFile *file, SubFile::Handle &hdl,
 				if (!(readColor(file, hdl, c1) && readColor(file, hdl, c2)
 				  && readColor(file, hdl, c3) && readColor(file, hdl, c4)))
 					return false;
-				_polygons[type] = Style::Polygon(QBrush(c1), QPen(c3, 2));
+				_polygons[type] = Polygon(QBrush(c1), QPen(c3, 2));
 				break;
 
 			case 0x06:
 			case 0x07:
 				if (!readColor(file, hdl, c1))
 					return false;
-				_polygons[type] = Style::Polygon(QBrush(c1));
+				_polygons[type] = Polygon(QBrush(c1));
 				break;
 
 			case 0x08:
@@ -432,7 +427,7 @@ bool Style::parsePolygons(SubFile *file, SubFile::Handle &hdl,
 				if (!readBitmap(file, hdl, img, 1))
 					return false;
 
-				_polygons[type] = Style::Polygon(QBrush(img));
+				_polygons[type] = Polygon(QBrush(img));
 				break;
 
 			case 0x09:
@@ -446,7 +441,7 @@ bool Style::parsePolygons(SubFile *file, SubFile::Handle &hdl,
 				if (!readBitmap(file, hdl, img, 1))
 					return false;
 
-				_polygons[type] = Style::Polygon(QBrush(img));
+				_polygons[type] = Polygon(QBrush(img));
 				break;
 
 			case 0x0B:
@@ -462,7 +457,7 @@ bool Style::parsePolygons(SubFile *file, SubFile::Handle &hdl,
 				if (!readBitmap(file, hdl, img, 1))
 					return false;
 
-				_polygons[type] = Style::Polygon(QBrush(img));
+				_polygons[type] = Polygon(QBrush(img));
 				break;
 
 			case 0x0E:
@@ -475,7 +470,7 @@ bool Style::parsePolygons(SubFile *file, SubFile::Handle &hdl,
 				if (!readBitmap(file, hdl, img, 1))
 					return false;
 
-				_polygons[type] = Style::Polygon(QBrush(img));
+				_polygons[type] = Polygon(QBrush(img));
 				break;
 
 			case 0x0F:
@@ -488,7 +483,7 @@ bool Style::parsePolygons(SubFile *file, SubFile::Handle &hdl,
 				if (!readBitmap(file, hdl, img, 1))
 					return false;
 
-				_polygons[type] = Style::Polygon(QBrush(img));
+				_polygons[type] = Polygon(QBrush(img));
 				break;
 
 			default:
@@ -516,7 +511,7 @@ bool Style::parseLines(SubFile *file, SubFile::Handle &hdl,
 
 		quint8 t8_1, t8_2, flags, rows;
 		if (!(file->seek(hdl, section.offset + info.offset)
-		  && file->readByte(hdl, t8_1) && file->readByte(hdl, t8_2)))
+		  && file->readUInt8(hdl, t8_1) && file->readUInt8(hdl, t8_2)))
 			return false;
 		flags = t8_1 & 0x07;
 		rows = t8_1 >> 3;
@@ -539,16 +534,16 @@ bool Style::parseLines(SubFile *file, SubFile::Handle &hdl,
 					if (!readBitmap(file, hdl, img, 1))
 						return false;
 
-					_lines[type] = Style::Line(img);
+					_lines[type] = Line(img);
 				} else {
-					if (!(file->readByte(hdl, w1) && file->readByte(hdl, w2)))
+					if (!(file->readUInt8(hdl, w1) && file->readUInt8(hdl, w2)))
 						return false;
 
 					_lines[type] = (w2 > w1)
-					  ? Style::Line(QPen(c1, w1, Qt::SolidLine, Qt::RoundCap,
+					  ? Line(QPen(c1, w1, Qt::SolidLine, Qt::RoundCap,
 						Qt::RoundJoin), QPen(c2, w2, Qt::SolidLine, Qt::RoundCap,
 						Qt::RoundJoin))
-					  : Style::Line(QPen(c1, w1, Qt::SolidLine, Qt::RoundCap,
+					  : Line(QPen(c1, w1, Qt::SolidLine, Qt::RoundCap,
 						Qt::RoundJoin));
 				}
 				break;
@@ -566,16 +561,16 @@ bool Style::parseLines(SubFile *file, SubFile::Handle &hdl,
 					if (!readBitmap(file, hdl, img, 1))
 						return false;
 
-					_lines[type] = Style::Line(img);
+					_lines[type] = Line(img);
 				} else {
-					if (!(file->readByte(hdl, w1) && file->readByte(hdl, w2)))
+					if (!(file->readUInt8(hdl, w1) && file->readUInt8(hdl, w2)))
 						return false;
 
 					_lines[type] = (w2 > w1)
-					  ? Style::Line(QPen(c1, w1, Qt::SolidLine, Qt::RoundCap,
+					  ? Line(QPen(c1, w1, Qt::SolidLine, Qt::RoundCap,
 						Qt::RoundJoin), QPen(c2, w2, Qt::SolidLine, Qt::RoundCap,
 						Qt::RoundJoin))
-					  : Style::Line(QPen(c1, w1, Qt::SolidLine, Qt::RoundCap,
+					  : Line(QPen(c1, w1, Qt::SolidLine, Qt::RoundCap,
 						Qt::RoundJoin));
 				}
 				break;
@@ -593,12 +588,12 @@ bool Style::parseLines(SubFile *file, SubFile::Handle &hdl,
 					if (!readBitmap(file, hdl, img, 1))
 						return false;
 
-					_lines[type] = Style::Line(img);
+					_lines[type] = Line(img);
 				} else {
-					if (!(file->readByte(hdl, w1) && file->readByte(hdl, w2)))
+					if (!(file->readUInt8(hdl, w1) && file->readUInt8(hdl, w2)))
 						return false;
 
-					_lines[type] = Style::Line(QPen(c1, w1, Qt::SolidLine,
+					_lines[type] = Line(QPen(c1, w1, Qt::SolidLine,
 					  Qt::RoundCap, Qt::RoundJoin));
 				}
 				break;
@@ -616,16 +611,16 @@ bool Style::parseLines(SubFile *file, SubFile::Handle &hdl,
 					if (!readBitmap(file, hdl, img, 1))
 						return false;
 
-					_lines[type] = Style::Line(img);
+					_lines[type] = Line(img);
 				} else {
-					if (!(file->readByte(hdl, w1) && file->readByte(hdl, w2)))
+					if (!(file->readUInt8(hdl, w1) && file->readUInt8(hdl, w2)))
 						return false;
 
 					_lines[type] = (w2 > w1)
-					  ? Style::Line(QPen(c1, w1, Qt::SolidLine, Qt::RoundCap,
+					  ? Line(QPen(c1, w1, Qt::SolidLine, Qt::RoundCap,
 						Qt::RoundJoin), QPen(c2, w2, Qt::SolidLine, Qt::RoundCap,
 						Qt::RoundJoin))
-					  : Style::Line(QPen(c1, w1, Qt::SolidLine, Qt::RoundCap,
+					  : Line(QPen(c1, w1, Qt::SolidLine, Qt::RoundCap,
 						Qt::RoundJoin));
 				}
 				break;
@@ -642,12 +637,12 @@ bool Style::parseLines(SubFile *file, SubFile::Handle &hdl,
 					if (!readBitmap(file, hdl, img, 1))
 						return false;
 
-					_lines[type] = Style::Line(img);
+					_lines[type] = Line(img);
 				} else {
-					if (!file->readByte(hdl, w1))
+					if (!file->readUInt8(hdl, w1))
 						return false;
 
-					_lines[type] = Style::Line(QPen(c1, w1, Qt::SolidLine,
+					_lines[type] = Line(QPen(c1, w1, Qt::SolidLine,
 					  Qt::RoundCap, Qt::RoundJoin));
 				}
 				break;
@@ -664,12 +659,12 @@ bool Style::parseLines(SubFile *file, SubFile::Handle &hdl,
 					if (!readBitmap(file, hdl, img, 1))
 						return false;
 
-					_lines[type] = Style::Line(img);
+					_lines[type] = Line(img);
 				} else {
-					if (!file->readByte(hdl, w1))
+					if (!file->readUInt8(hdl, w1))
 						return false;
 
-					_lines[type] = Style::Line(QPen(c1, w1, Qt::SolidLine,
+					_lines[type] = Line(QPen(c1, w1, Qt::SolidLine,
 					  Qt::RoundCap, Qt::RoundJoin));
 				}
 				break;
@@ -689,7 +684,7 @@ bool Style::parseLines(SubFile *file, SubFile::Handle &hdl,
 
 		if (textColor) {
 			quint8 labelFlags;
-			if (!file->readByte(hdl, labelFlags))
+			if (!file->readUInt8(hdl, labelFlags))
 				return false;
 			if (labelFlags & 0x08) {
 				if (!readColor(file, hdl, c1))
@@ -751,7 +746,7 @@ static bool readColorTable(SubFile *file, SubFile::Handle &hdl, QImage& img,
 
 		for (int i = 0; i < colors; i++) {
 			while (bits < 28) {
-				if (!file->readByte(hdl, byte))
+				if (!file->readUInt8(hdl, byte))
 					return false;
 
 				mask = 0x000000FF << bits;
@@ -801,9 +796,9 @@ bool Style::parsePoints(SubFile *file, SubFile::Handle &hdl,
 
 		quint8 t8_1, width, height, numColors, imgType;
 		if (!(file->seek(hdl, section.offset + info.offset)
-		  && file->readByte(hdl, t8_1) && file->readByte(hdl, width)
-		  && file->readByte(hdl, height) && file->readByte(hdl, numColors)
-		  && file->readByte(hdl, imgType)))
+		  && file->readUInt8(hdl, t8_1) && file->readUInt8(hdl, width)
+		  && file->readUInt8(hdl, height) && file->readUInt8(hdl, numColors)
+		  && file->readUInt8(hdl, imgType)))
 			return false;
 
 		bool localization = t8_1 & 0x04;
@@ -820,8 +815,8 @@ bool Style::parsePoints(SubFile *file, SubFile::Handle &hdl,
 		_points[type] = Point(img);
 
 		if (t8_1 == 0x03) {
-			if (!(file->readByte(hdl, numColors)
-			  && file->readByte(hdl, imgType)))
+			if (!(file->readUInt8(hdl, numColors)
+			  && file->readUInt8(hdl, imgType)))
 				return false;
 			if ((bpp = colors2bpp(numColors, imgType)) < 0)
 				continue;
@@ -830,8 +825,8 @@ bool Style::parsePoints(SubFile *file, SubFile::Handle &hdl,
 			if (!readBitmap(file, hdl, img, bpp))
 				return false;
 		} else if (t8_1 == 0x02) {
-			if (!(file->readByte(hdl, numColors)
-			  && file->readByte(hdl, imgType)))
+			if (!(file->readUInt8(hdl, numColors)
+			  && file->readUInt8(hdl, imgType)))
 				return false;
 			if ((bpp = colors2bpp(numColors, imgType)) < 0)
 				continue;
@@ -845,7 +840,7 @@ bool Style::parsePoints(SubFile *file, SubFile::Handle &hdl,
 		if (textColor) {
 			quint8 labelFlags;
 			QColor color;
-			if (!file->readByte(hdl, labelFlags))
+			if (!file->readUInt8(hdl, labelFlags))
 				return false;
 			if (labelFlags & 0x08) {
 				if (!readColor(file, hdl, color))
@@ -874,7 +869,7 @@ bool Style::parseDrawOrder(SubFile *file, SubFile::Handle &hdl,
 		quint8 type;
 		quint32 subtype;
 
-		if (!(file->readByte(hdl, type) && file->readUInt32(hdl, subtype)))
+		if (!(file->readUInt8(hdl, type) && file->readUInt32(hdl, subtype)))
 			return false;
 
 		if (!subtype)
@@ -895,7 +890,7 @@ bool Style::parseDrawOrder(SubFile *file, SubFile::Handle &hdl,
 
 bool Style::parseTYPFile(SubFile *file)
 {
-	SubFile::Handle hdl;
+	SubFile::Handle hdl(file);
 	Section points, lines, polygons, order;
 	quint16 tmp16, codepage;
 
@@ -942,7 +937,7 @@ Style::Style(SubFile *typ)
 	defaultPolygonStyle();
 	defaultPointStyle();
 
-	if (typ && typ->isValid())
+	if (typ)
 		parseTYPFile(typ);
 }
 
@@ -966,29 +961,8 @@ const Style::Point &Style::point(quint32 type) const
 {
 	static Point null;
 
-	QMap<quint16, Point>::const_iterator it = _points.find(type);
+	QMap<quint32, Point>::const_iterator it = _points.find(type);
 	return (it == _points.constEnd()) ? null : *it;
-}
-
-bool Style::isContourLine(quint32 type)
-{
-	return (type == TYPE(0x20) || type == TYPE(0x21) || type == TYPE(0x22)
-	  || type == TYPE(0x23) || type == TYPE(0x24) || type == TYPE(0x25));
-}
-
-bool Style::isSpot(quint32 type)
-{
-	return (type == TYPE(0x62) || type == TYPE(0x63));
-}
-
-bool Style::isSummit(quint32 type)
-{
-	return (type == 0x6616);
-}
-
-bool Style::isMajorRoad(quint32 type)
-{
-	return (type <= TYPE(0x04));
 }
 
 Style::POIClass Style::poiClass(quint32 type)
@@ -1039,6 +1013,13 @@ QDebug operator<<(QDebug dbg, const Style::Line &line)
 {
 	dbg.nospace() << "Line(" << penColor(line.foreground()) << ", "
 	  << penColor(line.background()) << ", " << !line.img().isNull() << ")";
+	return dbg.space();
+}
+
+QDebug operator<<(QDebug dbg, const Style::Point &point)
+{
+	dbg.nospace() << "Point(" << point.textFontSize() << ", "
+	  << point.textColor() << ", " << !point.img().isNull() << ")";
 	return dbg.space();
 }
 #endif // QT_NO_DEBUG

@@ -6,6 +6,7 @@
 #include <QDebug>
 #include "subfile.h"
 
+#define TYPE(t) ((t)<<8)
 
 class Style
 {
@@ -47,6 +48,7 @@ public:
 	private:
 		QBrush _brush;
 		QPen _pen;
+		QColor _textColor;
 	};
 
 	class Line {
@@ -80,6 +82,8 @@ public:
 	class Point {
 	public:
 		Point() : _textFontSize(NotSet) {}
+		Point(FontSize fontSize, const QColor &textColor = QColor())
+		  : _textColor(textColor), _textFontSize(fontSize) {}
 		Point(const QImage &img) : _textFontSize(NotSet), _img(img) {}
 
 		void setTextColor(const QColor &color) {_textColor = color;}
@@ -103,10 +107,22 @@ public:
 	const Point &point(quint32 type) const;
 	const QList<quint32> &drawOrder() const {return _drawOrder;}
 
-	static bool isContourLine(quint32 type);
-	static bool isSpot(quint32 type);
-	static bool isSummit(quint32 type);
-	static bool isMajorRoad(quint32 type);
+	static bool isContourLine(quint32 type)
+	  {return ((type >= TYPE(0x20) && type <= TYPE(0x25))
+	  || (type & 0xffff00) == TYPE(0x109));}
+	static bool isWaterArea(quint32 type)
+	  {return (type >= TYPE(0x3c) && type <= TYPE(0x44));}
+	static bool isMilitaryArea(quint32 type)
+	  {return (type == TYPE(0x04));}
+	static bool isNatureReserve(quint32 type)
+	  {return (type == TYPE(0x16));}
+	static bool isSpot(quint32 type)
+	  {return (type == TYPE(0x62) || type == TYPE(0x63));}
+	static bool isSummit(quint32 type)
+	  {return (type == 0x6616);}
+	static bool isMajorRoad(quint32 type)
+	  {return (type <= TYPE(0x04));}
+
 	static POIClass poiClass(quint32 type);
 
 private:
@@ -142,13 +158,14 @@ private:
 
 	QMap<quint32, Line> _lines;
 	QMap<quint32, Polygon> _polygons;
-	QMap<quint16, Point> _points;
+	QMap<quint32, Point> _points;
 	QList<quint32> _drawOrder;
 };
 
 #ifndef QT_NO_DEBUG
 QDebug operator<<(QDebug dbg, const Style::Polygon &polygon);
 QDebug operator<<(QDebug dbg, const Style::Line &line);
+QDebug operator<<(QDebug dbg, const Style::Point &point);
 #endif // QT_NO_DEBUG
 
 #endif // STYLE_H

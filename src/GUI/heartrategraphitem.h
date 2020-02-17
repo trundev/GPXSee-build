@@ -8,11 +8,10 @@ class HeartRateGraphItem : public GraphItem
 	Q_OBJECT
 
 public:
-	HeartRateGraphItem(const Graph &graph, GraphType type,
-	  QGraphicsItem *parent = 0);
+	HeartRateGraphItem(const Graph &graph, GraphType type, int width,
+	  const QColor &color, QGraphicsItem *parent = 0);
 
-private:
-	QString toolTip() const;
+	QString info() const;
 };
 
 #endif // HEARTRATEGRAPHITEM_H

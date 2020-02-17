@@ -1,145 +1,131 @@
-#include "trefile.h"
-#include "units.h"
+#include <cstring>
+#include "common/rectc.h"
+#include "common/garmin.h"
+#include "deltastream.h"
+#include "huffmanstream.h"
 #include "lblfile.h"
 #include "netfile.h"
 #include "rgnfile.h"
 
 
-bool RGNFile::BitStream::read(int bits, quint32 &val)
+bool RGNFile::skipClassFields(Handle &hdl) const
 {
-	val = 0;
+	quint8 flags;
+	quint32 rs;
 
-	for (int pos = 0; pos < bits; ) {
-		if (!_remaining) {
-			if (!_length || !_file.readByte(_hdl, _data))
-				return false;
-			_remaining = 8;
-			_length--;
-		}
+	if (!readUInt8(hdl, flags))
+		return false;
 
-		quint32 get = bits - pos;
-		if (get >= _remaining) {
-			val |= _data << pos;
-			pos += _remaining;
-			_remaining = 0;
-		} else {
-			quint32 mask = (1<<get) - 1;
-			val |= (_data & mask)<<pos;
-			_data >>= get;
-			_remaining -= get;
+	switch (flags >> 5) {
+		case 4:
+			rs = 1;
 			break;
-		}
+		case 5:
+			rs = 2;
+			break;
+		case 6:
+			rs = 3;
+			break;
+		case 7:
+			if (!readVUInt32(hdl, rs))
+				return false;
+			break;
+		default:
+			rs = 0;
+			break;
 	}
 
-	return true;
+	return seek(hdl, hdl.pos() + rs);
 }
 
-bool RGNFile::BitStream::readDelta(int bits, int sign, bool extraBit,
-  qint32 &delta)
+bool RGNFile::skipLclFields(Handle &hdl, const quint32 flags[3],
+  SegmentType type) const
 {
-	quint32 value;
-	int bo = 0;
+	quint32 bitfield = 0xFFFFFFFF;
 
-	if (!read(bits, value))
-		return false;
+	if (flags[0] & 0x20000000)
+		if (!readVBitfield32(hdl, bitfield))
+			return false;
 
-	if (extraBit) {
-		value>>=1;
-		bo = 1;
-	}
-
-	if (!sign) {
-		qint32 signMask = 1 << (bits - bo - 1);
-		if (value & signMask) {
-			qint32 comp = value ^ signMask;
-			if (comp)
-				delta = comp - signMask;
-			else {
-				qint32 other;
-				if (!readDelta(bits - bo, sign, false, other))
-					return false;
-				if (other < 0)
-					delta = 1 - signMask + other;
-				else
-					delta = signMask - 1 + other;
+	for (int i = 0; i < 29; i++) {
+		if ((flags[0] >> i) & 1) {
+			if (bitfield & 1) {
+				quint32 m = flags[(i >> 4) + 1] >> ((i * 2) & 0x1e) & 3;
+				switch (i) {
+					case 5:
+						if (m == 1 && type == Point) {
+							quint16 u16;
+							if (!readUInt16(hdl, u16))
+								return false;
+						}
+						break;
+					default:
+						break;
+				}
 			}
-		} else {
-			delta = value;
+			bitfield >>= 1;
 		}
-	} else {
-		delta = value * sign;
 	}
 
 	return true;
 }
 
-bool RGNFile::BitStream::finish()
+void RGNFile::clearFlags()
 {
-	while (_length--)
-		if (!_file.readByte(_hdl, _data))
-			return false;
-	return true;
+	memset(_polygonsFlags, 0, sizeof(_polygonsFlags));
+	memset(_linesFlags, 0, sizeof(_linesFlags));
+	memset(_pointsFlags, 0, sizeof(_pointsFlags));
 }
 
-
-bool RGNFile::init()
+bool RGNFile::init(Handle &hdl)
 {
-	Handle hdl;
+	quint16 hdrLen;
 
-	if (!(seek(hdl, 0x15) && readUInt32(hdl, _offset)
-	  && readUInt32(hdl, _size) && readUInt32(hdl, _polygonsOffset)
-	  && readUInt32(hdl, _polygonsSize) && seek(hdl, 0x39)
-	  && readUInt32(hdl, _linesOffset) && readUInt32(hdl, _linesSize)
-	  && seek(hdl, 0x55) && readUInt32(hdl, _pointsOffset)
-	  && readUInt32(hdl, _pointsSize)))
+	if (!(seek(hdl, _gmpOffset) && readUInt16(hdl, hdrLen)
+	  && seek(hdl, _gmpOffset + 0x15) && readUInt32(hdl, _offset)
+	  && readUInt32(hdl, _size)))
 		return false;
 
-	if (_offset + _size > size())
-		return false;
-
-	return true;
-}
-
-bool RGNFile::sign(BitStream &bs, int &val)
-{
-	quint32 bit;
-	val = 0;
-
-	if (!bs.read(1, bit))
-		return false;
-	if (bit) {
-		if (!bs.read(1, bit))
+	if (hdrLen >= 0x68) {
+		if (!(readUInt32(hdl, _polygonsOffset) && readUInt32(hdl, _polygonsSize)
+		  && seek(hdl, _gmpOffset + 0x2D) && readUInt32(hdl, _polygonsFlags[0])
+		  && readUInt32(hdl, _polygonsFlags[1]) && readUInt32(hdl, _polygonsFlags[2])
+		  && readUInt32(hdl, _linesOffset) && readUInt32(hdl, _linesSize)
+		  && seek(hdl, _gmpOffset + 0x49) && readUInt32(hdl, _linesFlags[0])
+		  && readUInt32(hdl, _linesFlags[1]) && readUInt32(hdl, _linesFlags[2])
+		  && readUInt32(hdl, _pointsOffset) && readUInt32(hdl, _pointsSize)
+		  && seek(hdl, _gmpOffset + 0x65) && readUInt32(hdl, _pointsFlags[0])
+		  && readUInt32(hdl, _pointsFlags[1]) && readUInt32(hdl, _pointsFlags[2])))
 			return false;
-		val = bit ? -1 : 1;
 	}
 
+	if (hdrLen >= 0x7D) {
+		quint32 dictOffset, dictSize, info;
+		if (!(seek(hdl, _gmpOffset + 0x71) && readUInt32(hdl, dictOffset)
+		  && readUInt32(hdl, dictSize) && readUInt32(hdl, info)))
+			return false;
+
+		if (dictSize && dictOffset && (info & 0x1E))
+			if (!_huffmanTable.load(*this, hdl, dictOffset, dictSize,
+			  ((info >> 1) & 0xF) - 1))
+				return false;
+	}
+
+	_init = true;
+
 	return true;
 }
 
-int RGNFile::bitSize(quint8 baseSize, bool variableSign, bool extraBit)
-{
-	int bits = 2;
-	if (baseSize <= 9)
-		bits += baseSize;
-	else
-		bits += 2 * baseSize - 9;
-
-	if (variableSign)
-		bits++;
-	if (extraBit)
-		bits++;
-
-	return bits;
-}
-
-bool RGNFile::polyObjects(const RectC &rect, Handle &hdl, const SubDiv *subdiv,
-  const Segment &segment, LBLFile *lbl, Handle &lblHdl, NETFile *net,
+bool RGNFile::polyObjects(Handle &hdl, const SubDiv *subdiv,
+  SegmentType segmentType, LBLFile *lbl, Handle &lblHdl, NETFile *net,
   Handle &netHdl, QList<IMG::Poly> *polys) const
 {
-	if (segment.start() == segment.end())
-		return true;
+	const SubDiv::Segment &segment = (segmentType == Line)
+	 ? subdiv->lines() : subdiv->polygons();
 
-	if (!seek(hdl, segment.start()))
+	if (!segment.isValid())
+		return true;
+	if (!seek(hdl, segment.offset()))
 		return false;
 
 	quint32 labelPtr;
@@ -147,60 +133,46 @@ bool RGNFile::polyObjects(const RectC &rect, Handle &hdl, const SubDiv *subdiv,
 	qint16 lon, lat;
 	quint16 len;
 
-	while (hdl.pos < (int)segment.end()) {
+	while (hdl.pos() < (int)segment.end()) {
 		IMG::Poly poly;
 
-		if (!(readByte(hdl, type) && readUInt24(hdl, labelPtr)
+		if (!(readUInt8(hdl, type) && readUInt24(hdl, labelPtr)
 		  && readInt16(hdl, lon) && readInt16(hdl, lat)))
 			return false;
 		if (type & 0x80) {
 			if (!readUInt16(hdl, len))
 				return false;
 		} else {
-			if (!readByte(hdl, len8))
+			if (!readUInt8(hdl, len8))
 				return false;
 			len = len8;
 		}
-		if (!readByte(hdl, bitstreamInfo))
+		if (!readUInt8(hdl, bitstreamInfo))
 			return false;
 
-		poly.type = (segment.type() == Segment::Polygon)
+		poly.type = (segmentType == Polygon)
 		  ? ((quint32)(type & 0x7F)) << 8 : ((quint32)(type & 0x3F)) << 8;
 
-		RectC br;
+
 		QPoint pos(subdiv->lon() + ((qint32)lon<<(24-subdiv->bits())),
 		  subdiv->lat() + ((qint32)lat<<(24-subdiv->bits())));
-		Coordinates c(toWGS84(pos.x()), toWGS84(pos.y()));
-		br = br.united(c);
+		Coordinates c(toWGS24(pos.x()), toWGS24(pos.y()));
+		poly.boundingRect = RectC(c, c);
 		poly.points.append(QPointF(c.lon(), c.lat()));
 
-		BitStream bs(*this, hdl, len);
-		int lonSign, latSign;
-		if (!sign(bs, lonSign) || !sign(bs, latSign))
-			return false;
-		bool extraBit = labelPtr & 0x400000;
-		int lonBits = bitSize(bitstreamInfo & 0x0F, !lonSign, extraBit);
-		int latBits = bitSize(bitstreamInfo >> 4, !latSign, false);
-
-		while (bs.hasNext(lonBits + latBits)) {
-			qint32 lonDelta, latDelta;
-
-			if (!(bs.readDelta(lonBits, lonSign, extraBit, lonDelta)
-			  &&  bs.readDelta(latBits, latSign, false, latDelta)))
-				return false;
-
+		qint32 lonDelta, latDelta;
+		DeltaStream stream(*this, hdl, len, bitstreamInfo, labelPtr & 0x400000,
+		  false);
+		while (stream.readNext(lonDelta, latDelta)) {
 			pos.rx() += lonDelta<<(24-subdiv->bits());
 			pos.ry() += latDelta<<(24-subdiv->bits());
 
-			Coordinates c(toWGS84(pos.x()), toWGS84(pos.y()));
+			Coordinates c(toWGS24(pos.x()), toWGS24(pos.y()));
 			poly.points.append(QPointF(c.lon(), c.lat()));
-			br = br.united(c);
+			poly.boundingRect = poly.boundingRect.united(c);
 		}
-		if (!bs.finish())
+		if (!(stream.atEnd() && stream.flush()))
 			return false;
-
-		if (!rect.intersects(br))
-			continue;
 
 		if (lbl && (labelPtr & 0x3FFFFF)) {
 			if (labelPtr & 0x800000) {
@@ -218,84 +190,99 @@ bool RGNFile::polyObjects(const RectC &rect, Handle &hdl, const SubDiv *subdiv,
 	return true;
 }
 
-bool RGNFile::extPolyObjects(const RectC &rect, Handle &hdl,
-  const SubDiv *subdiv, const Segment &segment, LBLFile *lbl, Handle &lblHdl,
+bool RGNFile::extPolyObjects(Handle &hdl, const SubDiv *subdiv, quint32 shift,
+  SegmentType segmentType, LBLFile *lbl, Handle &lblHdl,
   QList<IMG::Poly> *polys) const
 {
-	quint32 labelPtr;
-	quint8 type, subtype, len8, len82, bitstreamInfo;
+	quint32 labelPtr, len;
+	quint8 type, subtype;
 	qint16 lon, lat;
-	quint16 len;
+	const SubDiv::Segment &segment = (segmentType == Line)
+	 ? subdiv->extLines() : subdiv->extPolygons();
 
 
-	if (!seek(hdl, segment.start()))
+	if (!segment.isValid())
+		return true;
+	if (!seek(hdl, segment.offset()))
 		return false;
 
-	while (hdl.pos < (int)segment.end()) {
+	while (hdl.pos() < (int)segment.end()) {
 		IMG::Poly poly;
+		QPoint pos;
 
-		if (!(readByte(hdl, type) && readByte(hdl, subtype)
-		  && readInt16(hdl, lon) && readInt16(hdl, lat) && readByte(hdl, len8)))
+		if (!(readUInt8(hdl, type) && readUInt8(hdl, subtype)
+		  && readInt16(hdl, lon) && readInt16(hdl, lat)
+		  && readVUInt32(hdl, len)))
 			return false;
 
-		if (subtype & 0x80) {
-			qWarning("Polygons/lines with extra bytes not supported");
-			return false;
-		}
+		poly.type = 0x10000 | (quint16(type)<<8) | (subtype & 0x1F);
+		labelPtr = 0;
 
-		if (len8 & 0x01)
-			len = (len8>>1) - 1;
-		else {
-			if (!readByte(hdl, len82))
-				return false;
-			len = ((len8 | ((quint16)len82<<8))>>2) - 1;
-		}
-		if (!readByte(hdl, bitstreamInfo))
-			return false;
-		poly.type = 0x10000 + (quint16(type) << 8) + (subtype & 0x1F);
+		if (!_huffmanTable.isNull()) {
+			pos = QPoint((subdiv->lon()<<8) + ((qint32)lon<<(32-subdiv->bits())),
+			  (subdiv->lat()<<8) + ((qint32)lat<<(32-subdiv->bits())));
 
-		RectC br;
-		QPoint pos(subdiv->lon() + ((qint32)lon<<(24-subdiv->bits())),
-		  subdiv->lat() + ((qint32)lat<<(24-subdiv->bits())));
-		Coordinates c(toWGS84(pos.x()), toWGS84(pos.y()));
-		br = br.united(c);
-		poly.points.append(QPointF(c.lon(), c.lat()));
-
-		BitStream bs(*this, hdl, len);
-		int lonSign, latSign;
-		if (!sign(bs, lonSign) || !sign(bs, latSign))
-			return false;
-		quint32 extraBit;
-		bs.read(1, extraBit);
-		int lonBits = bitSize(bitstreamInfo & 0x0F, !lonSign, extraBit);
-		int latBits = bitSize(bitstreamInfo >> 4, !latSign, extraBit);
-
-		while (bs.hasNext(lonBits + latBits)) {
 			qint32 lonDelta, latDelta;
+			HuffmanStream stream(*this, hdl, len, _huffmanTable,
+			  segmentType == Line);
 
-			if (!(bs.readDelta(lonBits, lonSign, false, lonDelta)
-			  &&  bs.readDelta(latBits, latSign, false, latDelta)))
+			if (shift) {
+				if (!stream.readOffset(lonDelta, latDelta))
+					return false;
+				pos = QPoint(pos.x() | lonDelta<<(32-subdiv->bits()-shift),
+				  pos.y() | latDelta<<(32-subdiv->bits()-shift));
+			}
+			Coordinates c(toWGS32(pos.x()), toWGS32(pos.y()));
+			poly.boundingRect = RectC(c, c);
+			poly.points.append(QPointF(c.lon(), c.lat()));
+
+			while (stream.readNext(lonDelta, latDelta)) {
+				pos.rx() += lonDelta<<(32-subdiv->bits()-shift);
+				pos.ry() += latDelta<<(32-subdiv->bits()-shift);
+
+				Coordinates c(toWGS32(pos.x()), toWGS32(pos.y()));
+				poly.points.append(QPointF(c.lon(), c.lat()));
+				poly.boundingRect = poly.boundingRect.united(c);
+			}
+
+			if (!(stream.atEnd() && stream.flush()))
+				return false;
+		} else {
+			pos = QPoint(subdiv->lon() + ((qint32)lon<<(24-subdiv->bits())),
+			  subdiv->lat() + ((qint32)lat<<(24-subdiv->bits())));
+			Coordinates c(toWGS24(pos.x()), toWGS24(pos.y()));
+			poly.boundingRect = RectC(c, c);
+			poly.points.append(QPointF(c.lon(), c.lat()));
+
+			quint8 bitstreamInfo;
+			if (!readUInt8(hdl, bitstreamInfo))
 				return false;
 
-			pos.rx() += lonDelta<<(24-subdiv->bits());
-			pos.ry() += latDelta<<(24-subdiv->bits());
+			qint32 lonDelta, latDelta;
+			DeltaStream stream(*this, hdl, len - 1, bitstreamInfo, false, true);
 
-			Coordinates c(toWGS84(pos.x()), toWGS84(pos.y()));
-			poly.points.append(QPointF(c.lon(), c.lat()));
-			br = br.united(c);
+			while (stream.readNext(lonDelta, latDelta)) {
+				pos.rx() += lonDelta<<(24-subdiv->bits());
+				pos.ry() += latDelta<<(24-subdiv->bits());
+
+				Coordinates c(toWGS24(pos.x()), toWGS24(pos.y()));
+				poly.points.append(QPointF(c.lon(), c.lat()));
+				poly.boundingRect = poly.boundingRect.united(c);
+			}
+			if (!(stream.atEnd() && stream.flush()))
+				return false;
 		}
-		if (!bs.finish())
+
+		if (subtype & 0x20 && !readUInt24(hdl, labelPtr))
+			return false;
+		if (subtype & 0x80 && !skipClassFields(hdl))
+			return false;
+		if (subtype & 0x40 && !skipLclFields(hdl, segmentType == Line
+		  ? _linesFlags : _polygonsFlags, segmentType))
 			return false;
 
-		if (subtype & 0x20) {
-			if (!readUInt24(hdl, labelPtr))
-				return false;
-			if (lbl && (labelPtr & 0x3FFFFF))
-				poly.label = lbl->label(lblHdl, labelPtr & 0x3FFFFF);
-		}
-
-		if (!rect.intersects(br))
-			continue;
+		if (lbl && (labelPtr & 0x3FFFFF))
+			poly.label = lbl->label(lblHdl, labelPtr & 0x3FFFFF);
 
 		polys->append(poly);
 	}
@@ -303,45 +290,47 @@ bool RGNFile::extPolyObjects(const RectC &rect, Handle &hdl,
 	return true;
 }
 
-bool RGNFile::pointObjects(const RectC &rect, Handle &hdl, const SubDiv *subdiv,
-  const Segment &segment, LBLFile *lbl, Handle &lblHdl,
+bool RGNFile::pointObjects(Handle &hdl, const SubDiv *subdiv,
+  SegmentType segmentType, LBLFile *lbl, Handle &lblHdl,
   QList<IMG::Point> *points) const
 {
 	quint8 type, subtype;
 	qint16 lon, lat;
 	quint32 labelPtr;
+	const SubDiv::Segment &segment = (segmentType == IndexedPoint)
+	 ? subdiv->idxPoints() : subdiv->points();
 
-	if (!seek(hdl, segment.start()))
+	if (!segment.isValid())
+		return true;
+	if (!seek(hdl, segment.offset()))
 		return false;
 
-	while (hdl.pos < (int)segment.end()) {
+	while (hdl.pos() < (int)segment.end()) {
 		IMG::Point point;
 
-		if (!(readByte(hdl, type) && readUInt24(hdl, labelPtr)
+		if (!(readUInt8(hdl, type) && readUInt24(hdl, labelPtr)
 		  && readInt16(hdl, lon) && readInt16(hdl, lat)))
 			return false;
 		if (labelPtr & 0x800000) {
-			if (!readByte(hdl, subtype))
+			if (!readUInt8(hdl, subtype))
 				return false;
 		} else
 			subtype = 0;
 
 		point.type = (quint16)type<<8 | subtype;
 
-		qint16 lonOffset = lon<<(24-subdiv->bits());
-		qint16 latOffset = lat<<(24-subdiv->bits());
-		point.coordinates = Coordinates(toWGS84(subdiv->lon() + lonOffset),
-		  toWGS84(subdiv->lat() + latOffset));
+		qint32 lonOffset = lon<<(24-subdiv->bits());
+		qint32 latOffset = lat<<(24-subdiv->bits());
+		point.coordinates = Coordinates(toWGS24(subdiv->lon() + lonOffset),
+		  toWGS24(subdiv->lat() + latOffset));
 
-		if (!rect.contains(point.coordinates))
-			continue;
-
+		uint hash = qHash(QPair<uint,uint>(qHash(QPair<qint32, qint32>
+		  (subdiv->lon() + lonOffset, subdiv->lat() + latOffset)),
+		  labelPtr & 0x3FFFFF));
+		point.id = ((quint64)point.type)<<32 | hash;
 		point.poi = labelPtr & 0x400000;
-		if (lbl && (labelPtr & 0x3FFFFF)) {
+		if (lbl && (labelPtr & 0x3FFFFF))
 			point.label = lbl->label(lblHdl, labelPtr & 0x3FFFFF, point.poi);
-			point.id = ((quint64)point.type)<<40 | ((quint64)lbl->offset())<<24
-			  | (labelPtr & 0x3FFFFF);
-		}
 
 		points->append(point);
 	}
@@ -349,167 +338,134 @@ bool RGNFile::pointObjects(const RectC &rect, Handle &hdl, const SubDiv *subdiv,
 	return true;
 }
 
-bool RGNFile::extPointObjects(const RectC &rect, Handle &hdl,
-  const SubDiv *subdiv, const Segment &segment, LBLFile *lbl, Handle &lblHdl,
-  QList<IMG::Point> *points) const
+bool RGNFile::extPointObjects(Handle &hdl, const SubDiv *subdiv, LBLFile *lbl,
+  Handle &lblHdl, QList<IMG::Point> *points) const
 {
 	quint8 type, subtype;
 	qint16 lon, lat;
 	quint32 labelPtr;
+	const SubDiv::Segment &segment = subdiv->extPoints();
 
-	if (!seek(hdl, segment.start()))
+
+	if (!segment.isValid())
+		return true;
+	if (!seek(hdl, segment.offset()))
 		return false;
 
-	while (hdl.pos < (int)segment.end()) {
+	while (hdl.pos() < (int)segment.end()) {
 		IMG::Point point;
 
-		if (!(readByte(hdl, type) && readByte(hdl, subtype)
+		if (!(readUInt8(hdl, type) && readUInt8(hdl, subtype)
 		  && readInt16(hdl, lon) && readInt16(hdl, lat)))
 			return false;
 
-		if (subtype & 0x80) {
-			qWarning("Points with extra bytes not supported");
-			return false;
-		}
-
 		point.type = 0x10000 | (((quint32)type)<<8) | (subtype & 0x1F);
 
-		qint16 lonOffset = lon<<(24-subdiv->bits());
-		qint16 latOffset = lat<<(24-subdiv->bits());
-		point.coordinates = Coordinates(toWGS84(subdiv->lon() + lonOffset),
-		  toWGS84(subdiv->lat() + latOffset));
+		qint32 lonOffset = lon<<(24-subdiv->bits());
+		qint32 latOffset = lat<<(24-subdiv->bits());
+		point.coordinates = Coordinates(toWGS24(subdiv->lon() + lonOffset),
+		  toWGS24(subdiv->lat() + latOffset));
+		labelPtr = 0;
 
-		if (subtype & 0x20) {
-			if (!readUInt24(hdl, labelPtr))
-				return false;
-			point.poi = labelPtr & 0x400000;
-			if (lbl && (labelPtr & 0x3FFFFF)) {
-				point.label = lbl->label(lblHdl, labelPtr & 0x3FFFFF, point.poi);
-				point.id = ((quint64)point.type)<<40
-				  | ((quint64)lbl->offset())<<24 | (labelPtr & 0x3FFFFF);
-			}
-		}
+		if (subtype & 0x20 && !readUInt24(hdl, labelPtr))
+			return false;
+		if (subtype & 0x80 && !skipClassFields(hdl))
+			return false;
+		if (subtype & 0x40 && !skipLclFields(hdl, _pointsFlags, Point))
+			return false;
 
-		if (rect.contains(point.coordinates))
-			points->append(point);
+		// Discard NT points breaking style draw order logic (and causing huge
+		// performance drawback)
+		if (point.type == 0x11400)
+			continue;
+
+		uint hash = qHash(QPair<uint,uint>(qHash(QPair<qint32, qint32>
+		  (subdiv->lon() + lonOffset, subdiv->lat() + latOffset)),
+		  labelPtr & 0x3FFFFF));
+		point.id = ((quint64)point.type)<<32 | hash;
+		point.poi = labelPtr & 0x400000;
+		if (lbl && (labelPtr & 0x3FFFFF))
+			point.label = lbl->label(lblHdl, labelPtr & 0x3FFFFF, point.poi);
+
+		points->append(point);
 	}
 
 	return true;
 }
 
-
-void RGNFile::objects(const RectC &rect, const SubDiv *subdiv, LBLFile *lbl,
-  NETFile *net, QList<IMG::Poly> *polygons, QList<IMG::Poly> *lines,
-  QList<IMG::Point> *points)
+QMap<RGNFile::SegmentType, SubDiv::Segment> RGNFile::segments(Handle &hdl,
+  SubDiv *subdiv) const
 {
-	Handle rgnHdl, lblHdl, netHdl;
+	QMap<SegmentType, SubDiv::Segment> ret;
 
-	if (!_size && !init())
-		return;
-
-	QVector<RGNFile::Segment> seg(segments(rgnHdl, subdiv));
-	for (int i = 0; i < seg.size(); i++) {
-		switch (seg.at(i).type()) {
-			case Segment::Point:
-			case Segment::IndexedPoint:
-				if (points)
-					pointObjects(rect, rgnHdl, subdiv, seg.at(i), lbl, lblHdl,
-					  points);
-				break;
-			case Segment::Line:
-				if (lines)
-					polyObjects(rect, rgnHdl, subdiv, seg.at(i), lbl, lblHdl,
-					  net, netHdl, lines);
-				break;
-			case Segment::Polygon:
-				if (polygons)
-					polyObjects(rect, rgnHdl, subdiv, seg.at(i), lbl, lblHdl,
-					  net, netHdl, polygons);
-				break;
-		}
-	}
-}
-
-void RGNFile::extObjects(const RectC &rect, const SubDiv *subdiv, LBLFile *lbl,
-  QList<IMG::Poly> *polygons, QList<IMG::Poly> *lines,
-  QList<IMG::Point> *points)
-{
-	Handle rgnHdl, lblHdl;
-
-	if (!_size && !init())
-		return;
-
-	if (polygons && subdiv->polygonsOffset() != subdiv->polygonsEnd()) {
-		quint32 start = _polygonsOffset + subdiv->polygonsOffset();
-		quint32 end = subdiv->polygonsEnd()
-		  ? _polygonsOffset + subdiv->polygonsEnd()
-		  : _polygonsOffset + _polygonsSize;
-		extPolyObjects(rect, rgnHdl, subdiv, Segment(start, end,
-		  Segment::Polygon), lbl, lblHdl, polygons);
-	}
-	if (lines && subdiv->linesOffset() != subdiv->linesEnd()) {
-		quint32 start = _linesOffset + subdiv->linesOffset();
-		quint32 end = subdiv->linesEnd()
-		  ? _linesOffset + subdiv->linesEnd()
-		  : _linesOffset + _linesSize;
-		extPolyObjects(rect, rgnHdl, subdiv, Segment(start, end, Segment::Line),
-		  lbl, lblHdl, lines);
-	}
-	if (points && subdiv->pointsOffset() != subdiv->pointsEnd()) {
-		quint32 start = _pointsOffset + subdiv->pointsOffset();
-		quint32 end = subdiv->pointsEnd()
-		  ? _pointsOffset + subdiv->pointsEnd()
-		  : _pointsOffset + _pointsSize;
-		extPointObjects(rect, rgnHdl, subdiv, Segment(start, end,
-		  Segment::Point), lbl, lblHdl, points);
-	}
-}
-
-QVector<RGNFile::Segment> RGNFile::segments(Handle &hdl, const SubDiv *subdiv)
-  const
-{
-	if (subdiv->offset() == subdiv->end() || !(subdiv->objects() & 0xF0))
-		return QVector<Segment>();
+	if (subdiv->offset() == subdiv->end() || !(subdiv->objects() & 0x1F))
+		return ret;
 
 	quint32 offset = _offset + subdiv->offset();
 
 	int no = 0;
-	for (quint8 mask = 0x10; mask; mask <<= 1)
+	for (quint8 mask = 0x1; mask <= 0x10; mask <<= 1)
 		if (subdiv->objects() & mask)
 			no++;
 
 	if (!seek(hdl, offset))
-		return QVector<Segment>();
+		return ret;
 
-	QVector<Segment> ret;
 	quint32 start = offset + 2 * (no - 1);
-	quint16 po;
-	int cnt = 0;
+	quint32 ls = 0;
+	SegmentType lt = (SegmentType)0;
 
-	for (quint8 mask = 0x10; mask; mask <<= 1) {
+	for (quint16 mask = 0x1; mask <= 0x10; mask <<= 1) {
 		if (subdiv->objects() & mask) {
-			if (cnt) {
-				if (!readUInt16(hdl, po))
-					return QVector<Segment>();
+			if (ls) {
+				quint16 po;
+				if (!readUInt16(hdl, po) || !po)
+					return QMap<RGNFile::SegmentType, SubDiv::Segment>();
 				start = offset + po;
+				ret.insert(lt, SubDiv::Segment(ls, start));
 			}
-			if (!ret.isEmpty())
-				ret.last().setEnd(start);
-			ret.append(Segment(start, (Segment::Type)mask));
-			cnt++;
+
+			lt = (SegmentType)mask;
+			ls = start;
 		}
 	}
 
-	ret.last().setEnd(subdiv->end() ? _offset + subdiv->end() : _offset + _size);
+	ret.insert(lt, SubDiv::Segment(ls, subdiv->end()
+	  ? _offset + subdiv->end() : _offset + _size));
 
 	return ret;
 }
 
-#ifndef QT_NO_DEBUG
-QDebug operator<<(QDebug dbg, const RGNFile::Segment &segment)
+bool RGNFile::subdivInit(Handle &hdl, SubDiv *subdiv) const
 {
-	dbg.nospace() << "Segment(" << segment.start() << ", " << segment.end()
-	  << ", " << segment.type() << ")";
-	return dbg.space();
+	QMap<RGNFile::SegmentType, SubDiv::Segment> seg(segments(hdl, subdiv));
+	SubDiv::Segment extPoints, extLines, extPolygons;
+
+	if (subdiv->extPointsOffset() != subdiv->extPointsEnd()) {
+		quint32 start = _pointsOffset + subdiv->extPointsOffset();
+		quint32 end = subdiv->extPointsEnd()
+		  ? _pointsOffset + subdiv->extPointsEnd()
+		  : _pointsOffset + _pointsSize;
+		extPoints = SubDiv::Segment(start, end);
+	}
+	if (subdiv->extPolygonsOffset() != subdiv->extPolygonsEnd()) {
+		quint32 start = _polygonsOffset + subdiv->extPolygonsOffset();
+		quint32 end = subdiv->extPolygonsEnd()
+		  ? _polygonsOffset + subdiv->extPolygonsEnd()
+		  : _polygonsOffset + _polygonsSize;
+		extPolygons = SubDiv::Segment(start, end);
+	}
+	if (subdiv->extLinesOffset() != subdiv->extLinesEnd()) {
+		quint32 start = _linesOffset + subdiv->extLinesOffset();
+		quint32 end = subdiv->extLinesEnd()
+		  ? _linesOffset + subdiv->extLinesEnd()
+		  : _linesOffset + _linesSize;
+		extLines = SubDiv::Segment(start, end);
+	}
+
+	subdiv->init(seg.value(Point), seg.value(IndexedPoint), seg.value(Line),
+	  seg.value(Polygon), seg.value(RoadReference), extPoints, extLines,
+	  extPolygons);
+
+	return true;
 }
-#endif // QT_NO_DEBUG

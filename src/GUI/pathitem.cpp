@@ -1,9 +1,11 @@
 #include <cmath>
 #include <QCursor>
 #include <QPainter>
+#include <QGraphicsSceneMouseEvent>
 #include "common/greatcircle.h"
 #include "map/map.h"
 #include "pathtickitem.h"
+#include "popup.h"
 #include "pathitem.h"
 
 
@@ -20,7 +22,7 @@ static inline unsigned segments(qreal distance)
 }
 
 PathItem::PathItem(const Path &path, Map *map, QGraphicsItem *parent)
-  : QGraphicsObject(parent), _path(path), _map(map)
+  : GraphicsItem(parent), _path(path), _map(map)
 {
 	Q_ASSERT(_path.isValid());
 
@@ -38,6 +40,7 @@ PathItem::PathItem(const Path &path, Map *map, QGraphicsItem *parent)
 
 	_markerDistance = _path.first().first().distance();
 	_marker = new MarkerItem(this);
+	_marker->setZValue(1);
 	_marker->setPos(position(_markerDistance));
 
 	setCursor(Qt::ArrowCursor);
@@ -336,7 +339,6 @@ void PathItem::updateTicks()
 		_ticks[i] = new PathTickItem(tr, (i + 1) * ts, this);
 		_ticks[i]->setPos(position((i + 1) * ts * xInM()));
 		_ticks[i]->setColor(_pen.color());
-		_ticks[i]->setToolTip(toolTip());
 	}
 }
 
@@ -380,4 +382,10 @@ void PathItem::hoverLeaveEvent(QGraphicsSceneHoverEvent *event)
 	update();
 
 	emit selected(false);
+}
+
+void PathItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
+{
+	Popup::show(event->screenPos(), info(), event->widget());
+	GraphicsItem::mousePressEvent(event);
 }

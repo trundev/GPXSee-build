@@ -6,16 +6,18 @@
 #include "data/path.h"
 #include "markeritem.h"
 #include "units.h"
+#include "graphicsscene.h"
 
 class Map;
 class PathTickItem;
 
-class PathItem : public QGraphicsObject
+class PathItem : public QObject, public GraphicsItem
 {
 	Q_OBJECT
 
 public:
 	PathItem(const Path &path, Map *map, QGraphicsItem *parent = 0);
+	virtual ~PathItem() {}
 
 	QPainterPath shape() const {return _shape;}
 	QRectF boundingRect() const {return _shape.boundingRect();}
@@ -35,14 +37,19 @@ public:
 	void showMarker(bool show);
 	void showTicks(bool show);
 
-	Units units() const {return _units;}
-
 public slots:
 	void moveMarker(qreal distance);
 	void hover(bool hover);
 
 signals:
 	void selected(bool);
+
+protected:
+	void hoverEnterEvent(QGraphicsSceneHoverEvent *event);
+	void hoverLeaveEvent(QGraphicsSceneHoverEvent *event);
+	void mousePressEvent(QGraphicsSceneMouseEvent *event);
+
+	Units _units;
 
 private:
 	const PathSegment *segment(qreal x) const;
@@ -55,15 +62,11 @@ private:
 	unsigned tickSize() const;
 	void updateTicks();
 
-	void hoverEnterEvent(QGraphicsSceneHoverEvent *event);
-	void hoverLeaveEvent(QGraphicsSceneHoverEvent *event);
-
 	Path _path;
 	Map *_map;
 	qreal _markerDistance;
 	int _digitalZoom;
 
-	Units _units;
 	qreal _width;
 	QPen _pen;
 	QPainterPath _shape;

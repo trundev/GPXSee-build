@@ -1,5 +1,7 @@
 #include <QImageReader>
 #include <QFileInfo>
+#include <QStringList>
+#include "csv.h"
 #include "csvparser.h"
 #include "common/evdata.h"
 #include "GUI/icons.h"
@@ -22,42 +24,38 @@ bool CSVParser::parse_waypoints(QFile *file, QList<TrackData> &tracks,
 	Q_UNUSED(tracks);
 	Q_UNUSED(routes);
 	Q_UNUSED(polygons);
-	bool res;
+	CSV csv(file);
+	QStringList entry;
+	bool ok;
 
-	_errorLine = 1;
-	_errorString.clear();
 
-	while (!file->atEnd()) {
-		QByteArray line = file->readLine();
-		QList<QByteArray> list = line.split(',');
-		if (list.size() < 3) {
+	while (!csv.atEnd()) {
+		if (!csv.readEntry(entry) || entry.size() < 3) {
 			_errorString = "Parse error";
+			_errorLine = csv.line();
 			return false;
 		}
 
-		qreal lon = list[0].trimmed().toDouble(&res);
-		if (!res || (lon < -180.0 || lon > 180.0)) {
+		double lon = entry.at(0).trimmed().toDouble(&ok);
+		if (!ok || (lon < -180.0 || lon > 180.0)) {
 			_errorString = "Invalid longitude";
+			_errorLine = csv.line();
 			return false;
 		}
-		qreal lat = list[1].trimmed().toDouble(&res);
-		if (!res || (lat < -90.0 || lat > 90.0)) {
+		double lat = entry.at(1).trimmed().toDouble(&ok);
+		if (!ok || (lat < -90.0 || lat > 90.0)) {
 			_errorString = "Invalid latitude";
+			_errorLine = csv.line();
 			return false;
 		}
 		Waypoint wp(Coordinates(lon, lat));
-
-		QByteArray ba = list[2].trimmed();
-		QString name = QString::fromUtf8(ba.data(), ba.size());
-		wp.setName(name);
-
-		if (list.size() > 3) {
-			ba = list[3].trimmed();
-			wp.setDescription(QString::fromUtf8(ba.data(), ba.size()));
-		}
+		wp.setName(entry.at(2).trimmed());
+		if (entry.size() > 3)
+			wp.setDescription(entry.at(3).trimmed());
 
 		waypoints.append(wp);
-		_errorLine++;
+
+		entry.clear();
 	}
 
 	return true;
@@ -263,7 +261,7 @@ bool CSVParser::parse_wheellog(QFile *file, QList<TrackData> &tracks,
 #if 1	//Experimental: Add icons
 				static ImageInfo poiIcon(SHOW_POI_ICON, QImageReader(SHOW_POI_ICON).size());
 				static ImageInfo alertIcon(CLOSE_FILE_ICON, QImageReader(CLOSE_FILE_ICON).size());
-				waypoint.setImage(evdata.hasAlert() ?  alertIcon : poiIcon);
+				waypoint.addImage(evdata.hasAlert() ?  alertIcon : poiIcon);
 #endif
 				waypoints.append(waypoint);
 			}

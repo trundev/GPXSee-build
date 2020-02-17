@@ -16,6 +16,7 @@
 #include "scaleitem.h"
 #include "coordinatesitem.h"
 #include "keys.h"
+#include "graphicsscene.h"
 #include "mapview.h"
 
 
@@ -32,7 +33,7 @@ MapView::MapView(Map *map, POI *poi, QWidget *parent)
 	Q_ASSERT(map != 0);
 	Q_ASSERT(poi != 0);
 
-	_scene = new QGraphicsScene(this);
+	_scene = new GraphicsScene(this);
 	setScene(_scene);
 	setDragMode(QGraphicsView::ScrollHandDrag);
 	setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
@@ -215,12 +216,12 @@ QList<PathItem *> MapView::loadData(const Data &data)
 	QList<PathItem *> paths;
 	int zoom = _map->zoom();
 
+	for (int i = 0; i < data.areas().count(); i++)
+		addArea(data.areas().at(i));
 	for (int i = 0; i < data.tracks().count(); i++)
 		paths.append(addTrack(data.tracks().at(i)));
 	for (int i = 0; i < data.routes().count(); i++)
 		paths.append(addRoute(data.routes().at(i)));
-	for (int i = 0; i < data.areas().count(); i++)
-		addArea(data.areas().at(i));
 	addWaypoints(data.waypoints());
 
 	if (_tracks.empty() && _routes.empty() && _waypoints.empty()
@@ -255,17 +256,18 @@ QPointF MapView::contentCenter() const
 
 void MapView::updatePOIVisibility()
 {
-	QHash<SearchPointer<Waypoint>, WaypointItem*>::const_iterator it, jt;
-
 	if (!_showPOI)
 		return;
 
-	for (it = _pois.constBegin(); it != _pois.constEnd(); it++)
+	for (POIHash::const_iterator it = _pois.constBegin();
+	  it != _pois.constEnd(); it++)
 		it.value()->show();
 
 	if (!_overlapPOIs) {
-		for (it = _pois.constBegin(); it != _pois.constEnd(); it++) {
-			for (jt = _pois.constBegin(); jt != _pois.constEnd(); jt++) {
+		for (POIHash::const_iterator it = _pois.constBegin();
+		  it != _pois.constEnd(); it++) {
+			for (POIHash::const_iterator jt = _pois.constBegin();
+			  jt != _pois.constEnd(); jt++) {
 				if (it.value()->isVisible() && jt.value()->isVisible()
 				  && it != jt && it.value()->collidesWithItem(jt.value()))
 					jt.value()->hide();
@@ -288,8 +290,8 @@ void MapView::rescale()
 	for (int i = 0; i < _waypoints.size(); i++)
 		_waypoints.at(i)->setMap(_map);
 
-	QHash<SearchPointer<Waypoint>, WaypointItem*>::const_iterator it;
-	for (it = _pois.constBegin(); it != _pois.constEnd(); it++)
+	for (POIHash::const_iterator it = _pois.constBegin();
+	  it != _pois.constEnd(); it++)
 		it.value()->setMap(_map);
 
 	updatePOIVisibility();
@@ -339,8 +341,8 @@ void MapView::setMap(Map *map)
 	for (int i = 0; i < _waypoints.size(); i++)
 		_waypoints.at(i)->setMap(map);
 
-	QHash<SearchPointer<Waypoint>, WaypointItem*>::const_iterator it;
-	for (it = _pois.constBegin(); it != _pois.constEnd(); it++)
+	for (POIHash::const_iterator it = _pois.constBegin();
+	  it != _pois.constEnd(); it++)
 		it.value()->setMap(_map);
 	updatePOIVisibility();
 
@@ -364,12 +366,10 @@ void MapView::setPOI(POI *poi)
 
 void MapView::updatePOI()
 {
-	QHash<SearchPointer<Waypoint>, WaypointItem*>::const_iterator it;
-
-	for (it = _pois.constBegin(); it != _pois.constEnd(); it++) {
+	for (POIHash::const_iterator it = _pois.constBegin();
+	  it != _pois.constEnd(); it++)
 		_scene->removeItem(it.value());
-		delete it.value();
-	}
+	qDeleteAll(_pois);
 	_pois.clear();
 
 	if (_showTracks)
@@ -426,8 +426,8 @@ void MapView::setUnits(Units units)
 	for (int i = 0; i < _waypoints.size(); i++)
 		_waypoints.at(i)->setToolTipFormat(_units, _coordinatesFormat);
 
-	QHash<SearchPointer<Waypoint>, WaypointItem*>::const_iterator it;
-	for (it = _pois.constBegin(); it != _pois.constEnd(); it++)
+	for (POIHash::const_iterator it = _pois.constBegin();
+	  it != _pois.constEnd(); it++)
 		it.value()->setToolTipFormat(_units, _coordinatesFormat);
 }
 
@@ -445,8 +445,8 @@ void MapView::setCoordinatesFormat(CoordinatesFormat format)
 	for (int i = 0; i < _routes.count(); i++)
 		_routes[i]->setCoordinatesFormat(_coordinatesFormat);
 
-	QHash<SearchPointer<Waypoint>, WaypointItem*>::const_iterator it;
-	for (it = _pois.constBegin(); it != _pois.constEnd(); it++)
+	for (POIHash::const_iterator it = _pois.constBegin();
+	  it != _pois.constEnd(); it++)
 		it.value()->setToolTipFormat(_units, _coordinatesFormat);
 }
 
@@ -461,8 +461,6 @@ void MapView::clearMapCache()
 
 void MapView::digitalZoom(int zoom)
 {
-	QHash<SearchPointer<Waypoint>, WaypointItem*>::const_iterator it;
-
 	if (zoom) {
 		_digitalZoom += zoom;
 		scale(pow(2, zoom), pow(2, zoom));
@@ -479,7 +477,8 @@ void MapView::digitalZoom(int zoom)
 		_areas.at(i)->setDigitalZoom(_digitalZoom);
 	for (int i = 0; i < _waypoints.size(); i++)
 		_waypoints.at(i)->setDigitalZoom(_digitalZoom);
-	for (it = _pois.constBegin(); it != _pois.constEnd(); it++)
+	for (POIHash::const_iterator it = _pois.constBegin();
+	  it != _pois.constEnd(); it++)
 		it.value()->setDigitalZoom(_digitalZoom);
 
 	_mapScale->setDigitalZoom(_digitalZoom);
@@ -747,8 +746,8 @@ void MapView::showPOI(bool show)
 {
 	_showPOI = show;
 
-	QHash<SearchPointer<Waypoint>, WaypointItem*>::const_iterator it;
-	for (it = _pois.constBegin(); it != _pois.constEnd(); it++)
+	for (POIHash::const_iterator it = _pois.constBegin();
+	  it != _pois.constEnd(); it++)
 		it.value()->setVisible(show);
 
 	updatePOIVisibility();
@@ -758,8 +757,8 @@ void MapView::showPOILabels(bool show)
 {
 	_showPOILabels = show;
 
-	QHash<SearchPointer<Waypoint>, WaypointItem*>::const_iterator it;
-	for (it = _pois.constBegin(); it != _pois.constEnd(); it++)
+	for (POIHash::const_iterator it = _pois.constBegin();
+	  it != _pois.constEnd(); it++)
 		it.value()->showLabel(show);
 
 	updatePOIVisibility();
@@ -852,21 +851,19 @@ void MapView::setWaypointColor(const QColor &color)
 
 void MapView::setPOISize(int size)
 {
-	QHash<SearchPointer<Waypoint>, WaypointItem*>::const_iterator it;
-
 	_poiSize = size;
 
-	for (it = _pois.constBegin(); it != _pois.constEnd(); it++)
+	for (POIHash::const_iterator it = _pois.constBegin();
+	  it != _pois.constEnd(); it++)
 		it.value()->setSize(size);
 }
 
 void MapView::setPOIColor(const QColor &color)
 {
-	QHash<SearchPointer<Waypoint>, WaypointItem*>::const_iterator it;
-
 	_poiColor = color;
 
-	for (it = _pois.constBegin(); it != _pois.constEnd(); it++)
+	for (POIHash::const_iterator it = _pois.constBegin();
+	  it != _pois.constEnd(); it++)
 		it.value()->setColor(color);
 }
 
@@ -1003,8 +1000,8 @@ void MapView::setDevicePixelRatio(qreal deviceRatio, qreal mapRatio)
 	for (int i = 0; i < _waypoints.size(); i++)
 		_waypoints.at(i)->setMap(_map);
 
-	QHash<SearchPointer<Waypoint>, WaypointItem*>::const_iterator it;
-	for (it = _pois.constBegin(); it != _pois.constEnd(); it++)
+	for (POIHash::const_iterator it = _pois.constBegin();
+	  it != _pois.constEnd(); it++)
 		it.value()->setMap(_map);
 	updatePOIVisibility();
 
@@ -1021,13 +1018,17 @@ void MapView::setDevicePixelRatio(qreal deviceRatio, qreal mapRatio)
 
 void MapView::setProjection(int id)
 {
-	Projection projection(PCS::pcs(id));
-	if (!projection.isValid())
-		return;
-
-	_projection = projection;
-
+	const PCS *pcs;
+	const GCS *gcs;
 	Coordinates center = _map->xy2ll(mapToScene(viewport()->rect().center()));
+
+	if ((pcs = PCS::pcs(id)))
+		_projection = Projection(pcs);
+	else if ((gcs = GCS::gcs(id)))
+		_projection = Projection(gcs);
+	else
+		qWarning("%d: Unknown PCS/GCS id", id);
+
 	_map->setProjection(_projection);
 	rescale();
 	centerOn(_map->ll2xy(center));

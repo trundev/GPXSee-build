@@ -30,6 +30,7 @@ class PathItem;
 class GraphItem;
 class AreaItem;
 class Area;
+class GraphicsScene;
 
 class MapView : public QGraphicsView
 {
@@ -92,6 +93,8 @@ private slots:
 	void reloadMap();
 
 private:
+	typedef QHash<SearchPointer<Waypoint>, WaypointItem*> POIHash;
+
 	PathItem *addTrack(const Track &track);
 	PathItem *addRoute(const Route &route);
 	void addArea(const Area &area);
@@ -118,14 +121,14 @@ private:
 	void mouseMoveEvent(QMouseEvent *event);
 	void leaveEvent(QEvent *event);
 
-	QGraphicsScene *_scene;
+	GraphicsScene *_scene;
 	ScaleItem *_mapScale;
 	CoordinatesItem *_coordinates;
 	QList<TrackItem*> _tracks;
 	QList<RouteItem*> _routes;
 	QList<WaypointItem*> _waypoints;
 	QList<AreaItem*> _areas;
-	QHash<SearchPointer<Waypoint>, WaypointItem*> _pois;
+	POIHash _pois;
 
 	RectC _tr, _rr, _wr, _ar;
 	qreal _res;
