@@ -1,0 +1,137 @@
+name: Build
+
+on: [push]
+
+env:
+  QTVER: v5.14.2
+  # QT-Build repo to download the pre-build QT asset
+  QT_BUILD_OWNER: trundev
+  QT_BUILD_REPO: QT-Build
+  # vcxproj parameters
+  BuildConfiguration: release
+  vcvars_bat: '"C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat"'
+  # Development options
+  #EXPORT_INTERMEDIATE: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: Prepare MSVS environment
+      run: |
+        $tempfile = [IO.Path]::GetTempFileName()
+        $proc = start-process -NoNewWindow -Wait -PassThru -RedirectStandardOutput $tempfile "$env:ComSpec" "/c $env:vcvars_bat 2> nul && set"
+        if ($proc.ExitCode) {exit $proc.ExitCode}
+        Get-Content $tempfile | foreach-object {
+          $s = $_.Split("=",2)
+          if ($s.Length -eq 2) {
+            $n,$v = $s
+            # Export new variables only
+            if (-not $(Test-Path env:$n) -or $v -ne $(Get-Item env:$n).Value) {
+              echo "::set-env name=$n::$v"
+            }
+          }
+        }
+        del $tempfile
+
+    - name: Download QT Build (github-script)
+      uses: actions/github-script@0.4.0
+      if: false
+      env:
+        ASSET_POSTFIX: ${{ env.QTVER }}-win32-msvc_v${{ env.VisualStudioVersion }}
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          tag = '${{ env.QTVER }}'
+          console.log('Get release by tag: ' + tag)
+          const result = await github.repos.getReleaseByTag({
+            owner: '${{ env.QT_BUILD_OWNER }}',
+            repo: '${{ env.QT_BUILD_REPO }}',
+            tag: tag
+          })
+          const assets = result.data.assets
+
+          for (i in assets) {
+            const a = assets[i]
+            console.log('Inspecting: ' + a.name + ', ' + a.label)
+            if ((a.name + a.label).includes('${{ env.ASSET_POSTFIX }}')) {
+              console.log('Downloading from: ' + a.url)
+              const result = await github.request(a.url)
+              // TODO: Unzip the result
+              return result
+            }
+          }
+
+    - name: Download QT Build (powershell)
+      if: true
+      env:
+        ASSET_POSTFIX: ${{ env.QTVER }}-win32-msvc_v${{ env.VisualStudioVersion }}
+      run: |
+        $res = Invoke-WebRequest -H @{Authorization='token ${{ secrets.GITHUB_TOKEN }}'; Accept='application/json'} "https://api.github.com/repos/${{ env.QT_BUILD_OWNER }}/${{ env.QT_BUILD_REPO }}/releases/tags/${{ env.QTVER }}" | ConvertFrom-Json
+        if (! $?) { exit 255 }
+        cd ..
+        foreach ($a in $res.assets) {
+          echo "Inspecting $($a.name), $($a.label)..."
+          if (($a.name + $a.label) -like "*${{ env.ASSET_POSTFIX }}*") {
+            echo "Downloading $($a.url) to $($a.name)..."
+            Invoke-WebRequest -H @{Authorization='token ${{ secrets.GITHUB_TOKEN }}'; Accept='application/octet-stream'} $a.url -o ${{ runner.temp }}\$($a.name)
+            if (! $?) { exit 255 }
+            $QT_DIR = "$PWD\QT-asset"
+            echo "Unzipping $($a.name)..."
+            unzip ${{ runner.temp }}\$($a.name) -d $QT_DIR
+            if (! $?) { exit 255 }
+            echo "Update qt.conf with Paths.Prefix = $QT_DIR"
+            echo "[Paths]" "Prefix = $QT_DIR".Replace("\", "/") >> $QT_DIR\bin\qt.conf
+            echo "Add path: $QT_DIR\bin"
+            echo "::add-path::$QT_DIR\bin"
+          }
+        }
+
+    - name: Run qmake
+      run: |
+        qmake -query
+        qmake
+
+    - name: Run nmake ${{ env.BuildConfiguration }}
+      run: |
+        nmake ${{ env.BuildConfiguration }}
+
+    - name: Run nmake install
+      run: |
+        nmake install
+
+    - name: Select VER_REF and ASSET_POSTFIX
+      run: |
+        # Translate QTVER
+        $VER_REF = $(git describe)
+        echo "::set-env name=VER_REF::$VER_REF"
+        echo "VER_REF set to $VER_REF"
+        $ASSET_POSTFIX = "$VER_REF-QT_${{ env.QTVER }}"
+        echo "::set-env name=ASSET_POSTFIX::$ASSET_POSTFIX"
+        echo "ASSET_POSTFIX set to $ASSET_POSTFIX"
+
+    - name: Export Intermediate Files
+      if: env.EXPORT_INTERMEDIATE
+      run: |
+        $dest = mkdir ../artifact
+        $generated = $(git ls-files -o -i --exclude='*')
+        ForEach ($file in $generated) {
+          $dest_file = $(Join-Path $dest $(Resolve-Path -Relative $file))
+          echo "$file -> $dest_file"
+          mkdir -Force $(Split-Path $dest_file)
+          Copy $file $dest_file
+        }
+
+    - uses: actions/upload-artifact@v1
+      if: env.EXPORT_INTERMEDIATE
+      with:
+        name: Artifact-${{ env.VER_REF }}
+        path: ../artifact
+
+    - uses: actions/upload-artifact@v1
+      with:
+        name: GPXSee-${{ env.ASSET_POSTFIX }}
+        path: ${{ env.BuildConfiguration }}/GPXSee.exe
