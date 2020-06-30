@@ -5,8 +5,8 @@
 
 
 EVGraphItem::EVGraphItem(const Graph &graph, GraphType type,
-  int width, const QColor &color,QGraphicsItem *parent)
-  : GraphItem(graph, type, width, color, parent), _scalarId((EVData::scalar_t)-1)
+  int width, const QColor &color, QGraphicsItem *parent)
+  : GraphItem(graph, type, width, color, Qt::SolidLine, parent), _scalarId((EVData::scalar_t)-1)
 {
 }
 
