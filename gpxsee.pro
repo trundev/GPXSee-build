@@ -3,7 +3,7 @@ unix:!macx {
 } else {
     TARGET = GPXSee
 }
-VERSION = 7.22
+VERSION = 7.30
 
 QT += core \
     gui \
@@ -14,12 +14,12 @@ greaterThan(QT_MAJOR_VERSION, 4) {
     QT += widgets
     QT += printsupport
 }
-lessThan(QT_MAJOR_VERSION, 5) {QT += opengl}
-equals(QT_MAJOR_VERSION, 5) : lessThan(QT_MINOR_VERSION, 4) {QT += opengl}
+lessThan(QT_VERSION, 5.4.0) {QT += opengl}
 
 INCLUDEPATH += ./src
 HEADERS += src/common/config.h \
     src/GUI/graphicsscene.h \
+    src/GUI/mapaction.h \
     src/GUI/popup.h \
     src/common/garmin.h \
     src/common/staticassert.h \
@@ -95,6 +95,7 @@ HEADERS += src/common/config.h \
     src/map/IMG/huffmanstream.h \
     src/map/IMG/huffmantable.h \
     src/map/IMG/mapdata.h \
+    src/map/IMG/rastertile.h \
     src/map/IMG/textpathitem.h \
     src/map/IMG/textpointitem.h \
     src/map/projection.h \
@@ -248,6 +249,7 @@ SOURCES += src/main.cpp \
     src/GUI/gearratiographitem.cpp \
     src/GUI/mapview.cpp \
     src/GUI/areaitem.cpp \
+    src/data/waypoint.cpp \
     src/map/IMG/bitmapline.cpp \
     src/map/IMG/bitstream.cpp \
     src/map/IMG/deltastream.cpp \
@@ -255,6 +257,7 @@ SOURCES += src/main.cpp \
     src/map/IMG/huffmanstream.cpp \
     src/map/IMG/huffmantable.cpp \
     src/map/IMG/mapdata.cpp \
+    src/map/IMG/rastertile.cpp \
     src/map/IMG/textpathitem.cpp \
     src/map/IMG/textpointitem.cpp \
     src/map/maplist.cpp \
@@ -343,6 +346,9 @@ SOURCES += src/main.cpp \
 greaterThan(QT_MAJOR_VERSION, 4) {
     HEADERS += src/data/geojsonparser.h
     SOURCES += src/data/geojsonparser.cpp
+}
+greaterThan(QT_VERSION, 5.1.0) {
+    HEADERS += src/GUI/timezoneinfo.h
 }
 
 DEFINES += APP_VERSION=\\\"$$VERSION\\\" \

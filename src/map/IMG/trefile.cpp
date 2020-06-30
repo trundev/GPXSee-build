@@ -3,6 +3,11 @@
 #include "trefile.h"
 
 
+static inline double RB(qint32 val)
+{
+	return (val == -0x800000 || val == 0x800000) ? 180.0 : toWGS24(val);
+}
+
 static void demangle(quint8 *data, quint32 size, quint32 key)
 {
 	static const unsigned char shuf[] = {
@@ -37,11 +42,12 @@ TREFile::~TREFile()
 	clear();
 }
 
-bool TREFile::init(bool baseMap)
+bool TREFile::init()
 {
 	Handle hdl(this);
 	quint8 locked;
 	quint16 hdrLen;
+
 
 	if (!(seek(hdl, _gmpOffset) && readUInt16(hdl, hdrLen)
 	  && seek(hdl, _gmpOffset + 0x0D) && readUInt8(hdl, locked)))
@@ -53,7 +59,8 @@ bool TREFile::init(bool baseMap)
 	  && readInt24(hdl, east) && readInt24(hdl, south) && readInt24(hdl, west)))
 		return false;
 	_bounds = RectC(Coordinates(toWGS24(west), toWGS24(north)),
-	  Coordinates(toWGS24(east), toWGS24(south)));
+	  Coordinates(RB(east), toWGS24(south)));
+	Q_ASSERT(_bounds.left() <= _bounds.right());
 
 	// Levels & subdivs info
 	quint32 levelsOffset, levelsSize, subdivSize;
@@ -108,7 +115,7 @@ bool TREFile::init(bool baseMap)
 		}
 	}
 
-	_isBaseMap = baseMap;
+	_isBaseMap = false;
 
 	return (_firstLevel >= 0);
 }
@@ -132,8 +139,8 @@ bool TREFile::load(int idx)
 
 	for (int j = 0; j < _levels.at(idx).subdivs; j++) {
 		quint32 oo;
-		qint32 lon, lat;
-		quint16 width, height, nextLevel;
+		qint32 lon, lat, width, height;
+		quint16 nextLevel;
 
 		if (!(readUInt32(hdl, oo) && readInt24(hdl, lon) && readInt24(hdl, lat)
 		  && readUInt16(hdl, width) && readUInt16(hdl, height)))
@@ -149,17 +156,16 @@ bool TREFile::load(int idx)
 			s->setEnd(offset);
 
 		width &= 0x7FFF;
-		width <<= (24 - _levels.at(idx).bits);
-		height <<= (24 - _levels.at(idx).bits);
-
+		width = LS(width, 24 - _levels.at(idx).bits);
+		height = LS(height, 24 - _levels.at(idx).bits);
 
 		s = new SubDiv(offset, lon, lat, _levels.at(idx).bits, objects);
 		sl.append(s);
 
 		double min[2], max[2];
-		RectC bounds(Coordinates(toWGS24(lon - width),
-		  toWGS24(lat + height + 1)), Coordinates(toWGS24(lon + width + 1),
-		  toWGS24(lat - height)));
+		RectC bounds(Coordinates(toWGS24(lon - width), toWGS24(lat + height)),
+		  Coordinates(RB(lon + width), toWGS24(lat - height)));
+		Q_ASSERT(bounds.left() <= bounds.right());
 
 		min[0] = bounds.left();
 		min[1] = bounds.bottom();
@@ -240,14 +246,14 @@ void TREFile::clear()
 
 int TREFile::level(int bits, bool baseMap)
 {
-	int idx = _firstLevel;
-
 	if (baseMap) {
-		if (!_isBaseMap && _levels.at(idx).bits > bits)
+		if (!_isBaseMap && _levels.first().bits > bits)
 			return -1;
 		if (_isBaseMap && bits > _levels.last().bits)
 			return -1;
 	}
+
+	int idx = _firstLevel;
 
 	for (int i = idx + 1; i < _levels.size(); i++) {
 		if (_levels.at(i).bits > bits)

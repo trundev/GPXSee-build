@@ -84,11 +84,13 @@ bool GMAP::loadTile(const QDir &dir, bool baseMap)
 		tile->addFile(fi.absoluteFilePath(), tileType(fi.suffix()));
 	}
 
-	if (!tile->init(baseMap)) {
+	if (!tile->init()) {
 		qWarning("%s: Invalid map tile", qPrintable(dir.path()));
 		delete tile;
 		return false;
 	}
+	if (baseMap)
+		tile->markAsBasemap();
 
 	double min[2], max[2];
 	min[0] = tile->bounds().left();
@@ -98,6 +100,8 @@ bool GMAP::loadTile(const QDir &dir, bool baseMap)
 	_tileTree.Insert(min, max, tile);
 
 	_bounds |= tile->bounds();
+	if (tile->zooms().min() < _zooms.min())
+		_zooms.setMin(tile->zooms().min());
 
 	return true;
 }
