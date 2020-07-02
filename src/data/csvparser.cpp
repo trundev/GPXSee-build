@@ -9,7 +9,7 @@
 // Wheellog CSV column headers
 #define ENUM_WHEELLOG_COLUMNS(F)	\
 	/* Android's GPS data */ \
-	F(date) F(time) F(latitude) F(longitude) F(gps_speed) F(gps_alt) F(gps_heading) F(gps_distance) \
+	F(date) F(time) F(datetime) F(latitude) F(longitude) F(gps_speed) F(gps_alt) F(gps_heading) F(gps_distance) \
 	/* Electric Vehicle data */ \
 	ENUM_EVDATA_SCALARS(F) \
 	F(mode) F(alert)
@@ -188,7 +188,7 @@ bool CSVParser::parse_wheellog(QFile *file, QList<TrackData> &tracks,
 			switch (idx)
 			{
 			// These columns contain strings or date-time
-			case wl_date_idx: case wl_time_idx: case wl_mode_idx: case wl_alert_idx:
+			case wl_date_idx: case wl_time_idx: case wl_datetime_idx: case wl_mode_idx: case wl_alert_idx:
 				//qDebug("%d(%s): %s\n", idx, WlColumns[idx].name, qUtf8Printable(str_val));
 				break;
 			// Other columns contain float numbers
@@ -204,6 +204,7 @@ bool CSVParser::parse_wheellog(QFile *file, QList<TrackData> &tracks,
 			/* Android's GPS data */
 			case wl_date_idx:			time_stamp.setDate(QDate::fromString(str_val, Qt::ISODate)); break;
 			case wl_time_idx:			time_stamp.setTime(QTime::fromString(str_val)); break;
+			case wl_datetime_idx:		time_stamp = QDateTime::fromString(str_val, Qt::ISODate); break;
 			case wl_latitude_idx:		coords.setLat(float_val); break;
 			case wl_longitude_idx:		coords.setLon(float_val); break;
 			case wl_gps_speed_idx:		trackpoint.setSpeed(float_val / 3.6); break;	// km/h -> m/s
