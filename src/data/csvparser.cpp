@@ -14,6 +14,23 @@
 	ENUM_EVDATA_SCALARS(F) \
 	F(mode) F(alert)
 
+// Translate column names before looking up into ENUM_WHEELLOG_COLUMNS (WlColumns array)
+struct
+{
+	const char *from;
+	const char *to;
+} const ColumnAliases[] =
+{
+	/* EUC world (https://euc.world) */
+	{"distance_total", "totaldistance"},
+	{"battery", "battery_level"},
+	{"temp", "system_temp"},	// Could be "temp_motor" -> "system_temp"
+	{"temp_batt", "cpu_temp"},
+	{"gps_lat", "latitude"},
+	{"gps_lon", "longitude"},
+	{"gps_bearing", "gps_heading"},
+};
+
 #define DRIVE_MODE	"Drive"
 #define MIN_SEGMENT_SIZE	100
 
@@ -117,6 +134,15 @@ bool CSVParser::parse_wheellog(QFile *file, QList<TrackData> &tracks,
 		QByteArray ba = header_list[col].trimmed();
 		QString name = QString::fromUtf8(ba.data(), ba.size());		
 
+		// Translate column aliases
+		for (size_t idx = 0; idx < sizeof(ColumnAliases) / sizeof(*ColumnAliases); idx++) {
+			if (name == ColumnAliases[idx].from) {
+				name = ColumnAliases[idx].to;
+				break;
+			}
+		}
+
+		// Lookup the column name
 		for (size_t idx = 0; idx < sizeof(WlColumns) / sizeof(*WlColumns); idx++) {
 			if (name == WlColumns[idx].name) {
 				if (WlColumns[idx].column == -1) {
