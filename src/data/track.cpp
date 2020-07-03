@@ -427,7 +427,7 @@ Graph Track::evScalar(EVData::scalar_t id) const
 
 		for (int j = 0; j < sd.count(); j++) {
 			qreal val = sd.at(j).evData().scalar(id);
-			if (!std::isnan(val))
+			if (!std::isnan(val) && !seg.outliers.contains(j))
 				gs.append(GraphPoint(seg.distance.at(j), seg.time.at(j), val));
 		}
 
