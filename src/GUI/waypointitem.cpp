@@ -13,6 +13,13 @@
 #define FS(size) \
 	((int)((qreal)size * 1.41))
 
+
+Units WaypointItem::_units = Metric;
+CoordinatesFormat WaypointItem::_format = DecimalDegrees;
+#ifdef ENABLE_TIMEZONES
+QTimeZone WaypointItem::_timeZone = QTimeZone::utc();
+#endif // ENABLE_TIMEZONES
+
 QString WaypointItem::info() const
 {
 	ToolTip tt;
@@ -21,15 +28,28 @@ QString WaypointItem::info() const
 		tt.insert(qApp->translate("WaypointItem", "Name"), _waypoint.name());
 	tt.insert(qApp->translate("WaypointItem", "Coordinates"),
 	  Format::coordinates(_waypoint.coordinates(), _format));
-	if (_waypoint.hasElevation())
-		tt.insert(qApp->translate("WaypointItem", "Elevation"),
-		  Format::elevation(_waypoint.elevation(), _units));
+	if (!std::isnan(_waypoint.elevations().first)) {
+		QString val = Format::elevation(_waypoint.elevations().first, _units);
+		if (!std::isnan(_waypoint.elevations().second))
+			val += " (" + Format::elevation(_waypoint.elevations().second,
+			  _units) + ")";
+		tt.insert(qApp->translate("WaypointItem", "Elevation"), val);
+	}
 	if (_waypoint.timestamp().isValid())
 		tt.insert(qApp->translate("WaypointItem", "Date"),
-		  _waypoint.timestamp().toString(Qt::SystemLocaleShortDate));
+#ifdef ENABLE_TIMEZONES
+		  _waypoint.timestamp().toTimeZone(_timeZone)
+#else // ENABLE_TIMEZONES
+		  _waypoint.timestamp()
+#endif // ENABLE_TIMEZONES
+		  .toString(Qt::SystemLocaleShortDate));
 	if (!_waypoint.description().isEmpty())
 		tt.insert(qApp->translate("WaypointItem", "Description"),
 		  _waypoint.description());
+	if (!_waypoint.comment().isEmpty()
+	  && _waypoint.comment() != _waypoint.description())
+		tt.insert(qApp->translate("WaypointItem", "Comment"),
+		  _waypoint.comment());
 	if (_waypoint.address().isValid()) {
 		QString addr("<address>");
 		addr += _waypoint.address().street();
@@ -69,9 +89,6 @@ WaypointItem::WaypointItem(const Waypoint &waypoint, Map *map,
 
 	_font.setPixelSize(FS(_size));
 	_font.setFamily(FONT_FAMILY);
-
-	_units = Metric;
-	_format = DecimalDegrees;
 
 	updateCache();
 
@@ -141,12 +158,6 @@ void WaypointItem::setColor(const QColor &color)
 
 	_color = color;
 	update();
-}
-
-void WaypointItem::setToolTipFormat(Units units, CoordinatesFormat format)
-{
-	_units = units;
-	_format = format;
 }
 
 void WaypointItem::showLabel(bool show)

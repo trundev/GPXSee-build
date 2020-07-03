@@ -6,7 +6,6 @@
 #include "transform.h"
 #include "IMG/mapdata.h"
 
-class TextItem;
 
 class IMGMap : public Map
 {
@@ -14,11 +13,11 @@ class IMGMap : public Map
 
 public:
 	IMGMap(const QString &fileName, QObject *parent = 0);
-	~IMGMap() {delete _data;}
+	~IMGMap() {qDeleteAll(_data);}
 
-	QString name() const {return _data->name();}
+	QString name() const {return _data.first()->name();}
 
-	QRectF bounds();
+	QRectF bounds() {return _bounds;}
 
 	virtual int zoom() const {return _zoom;}
 	virtual void setZoom(int zoom);
@@ -40,28 +39,17 @@ public:
 	QString errorString() const {return _errorString;}
 
 private:
-	friend class RasterTile;
-
+	void ll2xy(QList<MapData::Poly> &polys);
+	void ll2xy(QList<MapData::Point> &points);
 	Transform transform(int zoom) const;
 	void updateTransform();
-	void drawPolygons(QPainter *painter, const QList<MapData::Poly> &polygons);
-	void drawLines(QPainter *painter, const QList<MapData::Poly> &lines);
-	void drawTextItems(QPainter *painter, const QList<TextItem*> &textItems);
 
-	void processPolygons(QList<MapData::Poly> &polygons,
-	  QList<TextItem *> &textItems);
-	void processLines(QList<MapData::Poly> &lines, const QRect &tileRect,
-	  QList<TextItem*> &textItems);
-	void processPoints(QList<MapData::Point> &points, QList<TextItem*> &textItems);
-	void processShields(QList<MapData::Poly> &lines, const QRect &tileRect,
-	  QList<TextItem*> &textItems);
-	void processStreetNames(QList<MapData::Poly> &lines, const QRect &tileRect,
-	  QList<TextItem*> &textItems);
-
-	MapData *_data;
+	QList<MapData *> _data;
 	int _zoom;
 	Projection _projection;
 	Transform _transform;
+	QRectF _bounds;
+	RectC _dataBounds;
 
 	bool _valid;
 	QString _errorString;

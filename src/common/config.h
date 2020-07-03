@@ -18,4 +18,8 @@
 #define ENABLE_GEOJSON
 #endif // QT >= 5.0
 
+#if QT_VERSION >= QT_VERSION_CHECK(5, 5, 0)
+#define ENABLE_TIMEZONES
+#endif // QT >= 5.5
+
 #endif /* CONFIG_H */

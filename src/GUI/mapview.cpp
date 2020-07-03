@@ -2,7 +2,6 @@
 #include <QGraphicsScene>
 #include <QWheelEvent>
 #include <QApplication>
-#include <QPixmapCache>
 #include <QScrollBar>
 #include "data/poi.h"
 #include "data/data.h"
@@ -55,13 +54,11 @@ MapView::MapView(Map *map, POI *poi, QWidget *parent)
 	_map = map;
 	_map->load();
 	_map->setProjection(_projection);
-	connect(_map, SIGNAL(loaded()), this, SLOT(reloadMap()));
+	connect(_map, SIGNAL(tilesLoaded()), this, SLOT(reloadMap()));
 
 	_poi = poi;
 	connect(_poi, SIGNAL(pointsChanged()), this, SLOT(updatePOI()));
 
-	_units = Metric;
-	_coordinatesFormat = DecimalDegrees;
 	_mapOpacity = 1.0;
 	_backgroundColor = Qt::white;
 	_markerColor = Qt::red;
@@ -123,7 +120,6 @@ PathItem *MapView::addTrack(const Track &track)
 	ti->setColor(_palette.nextColor());
 	ti->setWidth(_trackWidth);
 	ti->setStyle(_trackStyle);
-	ti->setUnits(_units);
 	ti->setVisible(_showTracks);
 	ti->setDigitalZoom(_digitalZoom);
 	ti->setMarkerColor(_markerColor);
@@ -150,8 +146,6 @@ PathItem *MapView::addRoute(const Route &route)
 	ri->setColor(_palette.nextColor());
 	ri->setWidth(_routeWidth);
 	ri->setStyle(_routeStyle);
-	ri->setUnits(_units);
-	ri->setCoordinatesFormat(_coordinatesFormat);
 	ri->setVisible(_showRoutes);
 	ri->showWaypoints(_showRouteWaypoints);
 	ri->showWaypointLabels(_showWaypointLabels);
@@ -201,7 +195,6 @@ void MapView::addWaypoints(const QVector<Waypoint> &waypoints)
 		wi->setSize(_waypointSize);
 		wi->setColor(_waypointColor);
 		wi->showLabel(_showWaypointLabels);
-		wi->setToolTipFormat(_units, _coordinatesFormat);
 		wi->setVisible(_showWaypoints);
 		wi->setDigitalZoom(_digitalZoom);
 		_scene->addItem(wi);
@@ -317,7 +310,7 @@ void MapView::setMap(Map *map)
 	RectC cr(_map->xy2ll(vr.topLeft()), _map->xy2ll(vr.bottomRight()));
 
 	_map->unload();
-	disconnect(_map, SIGNAL(loaded()), this, SLOT(reloadMap()));
+	disconnect(_map, SIGNAL(tilesLoaded()), this, SLOT(reloadMap()));
 
 	_map = map;
 	_map->load();
@@ -325,7 +318,7 @@ void MapView::setMap(Map *map)
 #ifdef ENABLE_HIDPI
 	_map->setDevicePixelRatio(_deviceRatio, _mapRatio);
 #endif // ENABLE_HIDPI
-	connect(_map, SIGNAL(loaded()), this, SLOT(reloadMap()));
+	connect(_map, SIGNAL(tilesLoaded()), this, SLOT(reloadMap()));
 
 	digitalZoom(0);
 
@@ -351,7 +344,6 @@ void MapView::setMap(Map *map)
 	centerOn(nc);
 
 	reloadMap();
-	QPixmapCache::clear();
 }
 
 void MapView::setPOI(POI *poi)
@@ -403,7 +395,6 @@ void MapView::addPOI(const QList<Waypoint> &waypoints)
 		pi->showLabel(_showPOILabels);
 		pi->setVisible(_showPOI);
 		pi->setDigitalZoom(_digitalZoom);
-		pi->setToolTipFormat(_units, _coordinatesFormat);
 		_scene->addItem(pi);
 
 		_pois.insert(SearchPointer<Waypoint>(&(pi->waypoint())), pi);
@@ -412,51 +403,38 @@ void MapView::addPOI(const QList<Waypoint> &waypoints)
 
 void MapView::setUnits(Units units)
 {
-	if (_units == units)
-		return;
-
-	_units = units;
-
-	_mapScale->setUnits(_units);
+	WaypointItem::setUnits(units);
+	PathItem::setUnits(units);
 
 	for (int i = 0; i < _tracks.count(); i++)
-		_tracks[i]->setUnits(_units);
+		_tracks[i]->updateTicks();
 	for (int i = 0; i < _routes.count(); i++)
-		_routes[i]->setUnits(_units);
-	for (int i = 0; i < _waypoints.size(); i++)
-		_waypoints.at(i)->setToolTipFormat(_units, _coordinatesFormat);
+		_routes[i]->updateTicks();
 
-	for (POIHash::const_iterator it = _pois.constBegin();
-	  it != _pois.constEnd(); it++)
-		it.value()->setToolTipFormat(_units, _coordinatesFormat);
+	_mapScale->setUnits(units);
 }
 
 void MapView::setCoordinatesFormat(CoordinatesFormat format)
 {
-	if (_coordinatesFormat == format)
-		return;
+	WaypointItem::setCoordinatesFormat(format);
 
-	_coordinatesFormat = format;
+	_coordinates->setFormat(format);
+}
 
-	_coordinates->setFormat(_coordinatesFormat);
-
-	for (int i = 0; i < _waypoints.count(); i++)
-		_waypoints.at(i)->setToolTipFormat(_units, _coordinatesFormat);
-	for (int i = 0; i < _routes.count(); i++)
-		_routes[i]->setCoordinatesFormat(_coordinatesFormat);
-
-	for (POIHash::const_iterator it = _pois.constBegin();
-	  it != _pois.constEnd(); it++)
-		it.value()->setToolTipFormat(_units, _coordinatesFormat);
+void MapView::setTimeZone(const QTimeZone &zone)
+{
+#ifdef ENABLE_TIMEZONES
+	WaypointItem::setTimeZone(zone);
+	PathItem::setTimeZone(zone);
+#else // ENABLE_TIMEZONES
+	Q_UNUSED(zone);
+#endif // ENABLE_TIMEZONES
 }
 
 void MapView::clearMapCache()
 {
 	_map->clearCache();
-
-	fitMapZoom();
-	rescale();
-	centerOn(contentCenter());
+	reloadMap();
 }
 
 void MapView::digitalZoom(int zoom)
@@ -982,7 +960,6 @@ void MapView::setDevicePixelRatio(qreal deviceRatio, qreal mapRatio)
 
 	_deviceRatio = deviceRatio;
 	_mapRatio = mapRatio;
-	QPixmapCache::clear();
 
 	QRectF vr(mapToScene(viewport()->rect()).boundingRect()
 	  .intersected(_map->bounds()));

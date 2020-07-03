@@ -7,7 +7,7 @@
 ; The name of the installer
 Name "GPXSee"
 ; Program version
-!define VERSION "7.22"
+!define VERSION "7.31"
 
 ; The file to write
 OutFile "GPXSee-${VERSION}_x64.exe"
@@ -184,6 +184,7 @@ SectionGroup "Localization" SEC_LOCALIZATION
   !insertmacro LOCALIZATION "French" "fr"
   !insertmacro LOCALIZATION "German" "de"
   !insertmacro LOCALIZATION "Hungarian" "hu"
+  !insertmacro LOCALIZATION "Italian" "it"
   !insertmacro LOCALIZATION "Norwegian" "nb"
   !insertmacro LOCALIZATION "Polish" "pl"
   !insertmacro LOCALIZATION "Portuguese (Brazil)" "pt_BR"
