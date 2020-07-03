@@ -59,7 +59,7 @@ IMG::IMG(const QString &fileName) : _file(fileName)
 
 	QByteArray nba(QByteArray(d1, sizeof(d1)) + QByteArray(d2, sizeof(d2)));
 	_name = QString::fromLatin1(nba.constData(), nba.size()-1).trimmed();
-	_blockSize = 1 << (e1 + e2);
+	_blockBits = e1 + e2;
 
 	// Read the FAT table
 	quint8 flag;
@@ -132,11 +132,12 @@ IMG::IMG(const QString &fileName) : _file(fileName)
 	}
 
 	// Create tile tree
+	int minMapZoom = 24;
 	for (TileMap::const_iterator it = tileMap.constBegin();
 	  it != tileMap.constEnd(); ++it) {
 		VectorTile *tile = it.value();
 
-		if (!tile->init(false)) {
+		if (!tile->init()) {
 			qWarning("%s: %s: Invalid map tile", qPrintable(_file.fileName()),
 			  qPrintable(it.key()));
 			delete tile;
@@ -151,7 +152,25 @@ IMG::IMG(const QString &fileName) : _file(fileName)
 		_tileTree.Insert(min, max, tile);
 
 		_bounds |= tile->bounds();
+		if (tile->zooms().min() < _zooms.min())
+			_zooms.setMin(tile->zooms().min());
+		if (tile->zooms().min() < minMapZoom)
+			minMapZoom = tile->zooms().min();
 	}
+
+	// Detect and mark basemap
+	TileTree::Iterator it;
+	for (_tileTree.GetFirst(it); !_tileTree.IsNull(it); _tileTree.GetNext(it)) {
+		VectorTile *tile = _tileTree.GetAt(it);
+		if (tile->zooms().min() > minMapZoom)
+			_baseMap = true;
+		if (tile->zooms().min() == minMapZoom)
+			tile->markAsBasemap();
+	}
+	// Allow some extra zoom out on maps without basemaps, but not too much as
+	// this would kill the rendering performance
+	if (!_baseMap)
+		_zooms.setMin(_zooms.min() - 2);
 
 	if (!_tileTree.Count())
 		_errorString = "No usable map tile found";
@@ -182,9 +201,9 @@ template<class T> bool IMG::readValue(T &val)
 
 bool IMG::readBlock(int blockNum, char *data)
 {
-	if (!_file.seek((qint64)blockNum * (qint64)_blockSize))
+	if (!_file.seek((quint64)blockNum << _blockBits))
 		return false;
-	if (read(data, _blockSize) < _blockSize)
+	if (read(data, 1U<<_blockBits) < 1U<<_blockBits)
 		return false;
 
 	return true;

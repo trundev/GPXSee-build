@@ -2,17 +2,16 @@
 #define SUBFILE_H
 
 #include <QVector>
-#include <QDebug>
 #include <QFile>
 #include "img.h"
 
 
-#define BLOCK_SIZE 4096
+#define BLOCK_BITS 12 /* 4096 bytes */
 
 class SubFile
 {
 public:
-	enum Type {Unknown, TRE, RGN, LBL, NET, TYP, GMP};
+	enum Type {Unknown, TRE, RGN, LBL, NET, NOD, TYP, GMP};
 
 	class Handle
 	{
@@ -23,9 +22,9 @@ public:
 			if (subFile && subFile->_path) {
 				_file = new QFile(*(subFile->_path));
 				_file->open(QIODevice::ReadOnly);
-				_data.resize(BLOCK_SIZE);
+				_data.resize(1U<<BLOCK_BITS);
 			} else if (subFile)
-				_data.resize(subFile->_img->blockSize());
+				_data.resize(1U<<subFile->_img->blockBits());
 		}
 		~Handle() {delete _file;}
 
@@ -133,6 +132,7 @@ public:
 	}
 
 	bool readVUInt32(Handle &hdl, quint32 &val) const;
+	bool readVUInt32(Handle &hdl, quint32 bytes, quint32 &val) const;
 	bool readVBitfield32(Handle &hdl, quint32 &bitfield) const;
 
 	QString fileName() const {return _path ? *_path : _img->fileName();}
@@ -143,7 +143,7 @@ protected:
 private:
 	bool readByte(Handle &handle, quint8 &val) const
 	{
-		int blockSize = _img ? _img->blockSize() : BLOCK_SIZE;
+		int blockSize = _img ? 1U<<_img->blockBits() : 1U<<BLOCK_BITS;
 		val = handle._data.at(handle._blockPos++);
 		handle._pos++;
 		return (handle._blockPos >= blockSize)

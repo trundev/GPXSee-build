@@ -3,7 +3,7 @@ unix:!macx {
 } else {
     TARGET = GPXSee
 }
-VERSION = 7.22
+VERSION = 7.31
 
 QT += core \
     gui \
@@ -20,6 +20,7 @@ equals(QT_MAJOR_VERSION, 5) : lessThan(QT_MINOR_VERSION, 4) {QT += opengl}
 INCLUDEPATH += ./src
 HEADERS += src/common/config.h \
     src/GUI/graphicsscene.h \
+    src/GUI/mapaction.h \
     src/GUI/popup.h \
     src/common/garmin.h \
     src/common/staticassert.h \
@@ -96,7 +97,9 @@ HEADERS += src/common/config.h \
     src/map/IMG/gmap.h \
     src/map/IMG/huffmanstream.h \
     src/map/IMG/huffmantable.h \
+    src/map/IMG/nodfile.h \
     src/map/IMG/mapdata.h \
+    src/map/IMG/rastertile.h \
     src/map/IMG/textpathitem.h \
     src/map/IMG/textpointitem.h \
     src/map/projection.h \
@@ -253,13 +256,16 @@ SOURCES += src/main.cpp \
     src/GUI/gearratiographitem.cpp \
     src/GUI/mapview.cpp \
     src/GUI/areaitem.cpp \
+    src/data/waypoint.cpp \
     src/map/IMG/bitmapline.cpp \
     src/map/IMG/bitstream.cpp \
     src/map/IMG/deltastream.cpp \
     src/map/IMG/gmap.cpp \
     src/map/IMG/huffmanstream.cpp \
     src/map/IMG/huffmantable.cpp \
+    src/map/IMG/nodfile.cpp \
     src/map/IMG/mapdata.cpp \
+    src/map/IMG/rastertile.cpp \
     src/map/IMG/textpathitem.cpp \
     src/map/IMG/textpointitem.cpp \
     src/map/maplist.cpp \
@@ -349,6 +355,9 @@ greaterThan(QT_MAJOR_VERSION, 4) {
     HEADERS += src/data/geojsonparser.h
     SOURCES += src/data/geojsonparser.cpp
 }
+equals(QT_MAJOR_VERSION, 5):greaterThan(QT_MINOR_VERSION, 4) {
+    HEADERS += src/GUI/timezoneinfo.h
+}
 
 DEFINES += APP_VERSION=\\\"$$VERSION\\\" \
     QT_NO_DEPRECATED_WARNINGS
@@ -369,7 +378,8 @@ TRANSLATIONS = lang/gpxsee_en.ts \
     lang/gpxsee_es.ts \
     lang/gpxsee_pt_BR.ts \
     lang/gpxsee_uk.ts \
-    lang/gpxsee_hu.ts
+    lang/gpxsee_hu.ts \
+    lang/gpxsee_it.ts
 
 macx {
     ICON = icons/gpxsee.icns
@@ -389,7 +399,8 @@ macx {
         lang/gpxsee_es.qm \
         lang/gpxsee_pt_BR.qm \
         lang/gpxsee_uk.qm \
-        lang/gpxsee_hu.qm
+        lang/gpxsee_hu.qm \
+        lang/gpxsee_it.qm
     csv.path = Contents/Resources
     csv.files = pkg/csv
     maps.path = Contents/Resources

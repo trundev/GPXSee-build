@@ -17,8 +17,8 @@ public:
 
 	Path path() const;
 
-	Graph elevation() const;
-	Graph speed() const;
+	GraphPair elevation() const;
+	GraphPair speed() const;
 	Graph heartRate() const;
 	Graph temperature() const;
 	Graph cadence() const;
@@ -33,6 +33,7 @@ public:
 
 	const QString &name() const {return _data.name();}
 	const QString &description() const {return _data.description();}
+	const QString &comment() const {return _data.comment();}
 	const QVector<Link> &links() const {return _data.links();}
 
 	bool isValid() const;
@@ -48,6 +49,11 @@ public:
 	static void setOutlierElimination(bool eliminate)
 	  {_outlierEliminate = eliminate;}
 	static void useReportedSpeed(bool use) {_useReportedSpeed = use;}
+	static void useDEM(bool use) {_useDEM = use;}
+	static void showSecondaryElevation(bool show)
+	  {_show2ndElevation = show;}
+	static void showSecondarySpeed(bool show)
+	  {_show2ndSpeed = show;}
 
 private:
 	struct Segment {
@@ -59,6 +65,11 @@ private:
 	};
 
 	bool discardStopPoint(const Segment &seg, int i) const;
+
+	Graph demElevation() const;
+	Graph gpsElevation() const;
+	Graph reportedSpeed() const;
+	Graph computedSpeed() const;
 
 	TrackData _data;
 	QList<Segment> _segments;
@@ -74,6 +85,9 @@ private:
 	static qreal _pauseSpeed;
 	static int _pauseInterval;
 	static bool _useReportedSpeed;
+	static bool _useDEM;
+	static bool _show2ndElevation;
+	static bool _show2ndSpeed;
 };
 
 #endif // TRACK_H

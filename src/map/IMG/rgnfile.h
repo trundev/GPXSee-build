@@ -8,6 +8,7 @@
 
 class LBLFile;
 class NETFile;
+class NODFile;
 
 class RGNFile : public SubFile
 {
@@ -23,15 +24,14 @@ public:
 	RGNFile(IMG *img)
 	  : SubFile(img), _offset(0), _size(0), _polygonsOffset(0),
 	  _polygonsSize(0), _linesOffset(0), _linesSize(0), _pointsOffset(0),
-	  _pointsSize(0), _init(false) {clearFlags();}
+	  _pointsSize(0), _init(false) {}
 	RGNFile(const QString &path)
 	  : SubFile(path), _offset(0), _size(0), _polygonsOffset(0),
 	  _polygonsSize(0), _linesOffset(0), _linesSize(0), _pointsOffset(0),
-	  _pointsSize(0), _init(false) {clearFlags();}
+	  _pointsSize(0), _init(false) {}
 	RGNFile(SubFile *gmp, quint32 offset) : SubFile(gmp, offset), _offset(0),
 	  _size(0), _polygonsOffset(0), _polygonsSize(0), _linesOffset(0),
-	  _linesSize(0), _pointsOffset(0), _pointsSize(0), _init(false)
-	  {clearFlags();}
+	  _linesSize(0), _pointsOffset(0), _pointsSize(0), _init(false) {}
 
 	bool initialized() const {return _init;}
 	bool init(Handle &hdl);
@@ -46,29 +46,34 @@ public:
 	  QList<IMG::Poly> *polys) const;
 	bool extPointObjects(Handle &hdl, const SubDiv *subdiv, LBLFile *lbl,
 	  Handle &lblHdl, QList<IMG::Point> *points) const;
+	bool links(Handle &hdl, const SubDiv *subdiv, NETFile *net, Handle &netHdl,
+	  NODFile *nod, Handle &nodHdl, QList<IMG::Poly> *lines) const;
 
 	bool subdivInit(Handle &hdl, SubDiv *subdiv) const;
 
 private:
 	QMap<SegmentType, SubDiv::Segment> segments(Handle &hdl, SubDiv *subdiv)
 	  const;
-	void clearFlags();
 	bool skipClassFields(Handle &hdl) const;
-	bool skipLclFields(Handle &hdl, const quint32 flags[3], SegmentType type)
+	bool skipLclFields(Handle &hdl, const quint32 flags[3])
 	  const;
+	bool skipGblFields(Handle &hdl, quint32 flags) const;
 
 	quint32 _offset;
 	quint32 _size;
 
 	quint32 _polygonsOffset;
 	quint32 _polygonsSize;
-	quint32 _polygonsFlags[3];
+	quint32 _polygonsLclFlags[3];
+	quint32 _polygonsGblFlags;
 	quint32 _linesOffset;
 	quint32 _linesSize;
-	quint32 _linesFlags[3];
+	quint32 _linesLclFlags[3];
+	quint32 _linesGblFlags;
 	quint32 _pointsOffset;
 	quint32 _pointsSize;
-	quint32 _pointsFlags[3];
+	quint32 _pointsLclFlags[3];
+	quint32 _pointsGblFlags;
 
 	HuffmanTable _huffmanTable;
 

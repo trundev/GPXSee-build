@@ -12,6 +12,7 @@
 #include <QRadioButton>
 #include <QLabel>
 #include <QSysInfo>
+#include <QButtonGroup>
 #include "map/pcs.h"
 #include "icons.h"
 #include "colorbox.h"
@@ -166,11 +167,8 @@ QWidget *OptionsDialog::createAppearancePage()
 	// Palette & antialiasing
 	_baseColor = new ColorBox();
 	_baseColor->setColor(_options->palette.color());
-	_colorOffset = new QDoubleSpinBox();
-	_colorOffset->setMinimum(0);
-	_colorOffset->setMaximum(1.0);
-	_colorOffset->setSingleStep(0.01);
-	_colorOffset->setValue(_options->palette.shift());
+	_colorOffset = new PercentSlider();
+	_colorOffset->setValue(_options->palette.shift() * 100);
 	QFormLayout *paletteLayout = new QFormLayout();
 	paletteLayout->addRow(tr("Base color:"), _baseColor);
 	paletteLayout->addRow(tr("Palette shift:"), _colorOffset);
@@ -406,6 +404,8 @@ QWidget *OptionsDialog::createDataPage()
 		_reportedSpeed->setChecked(true);
 	else
 		_computedSpeed->setChecked(true);
+	_showSecondarySpeed = new QCheckBox(tr("Show secondary speed"));
+	_showSecondarySpeed->setChecked(_options->showSecondarySpeed);
 
 	_dataGPSElevation = new QRadioButton(tr("GPS data"));
 	_dataDEMElevation = new QRadioButton(tr("DEM data"));
@@ -413,43 +413,108 @@ QWidget *OptionsDialog::createDataPage()
 		_dataDEMElevation->setChecked(true);
 	else
 		_dataGPSElevation->setChecked(true);
+	_showSecondaryElevation = new QCheckBox(tr("Show secondary elevation"));
+	_showSecondaryElevation->setChecked(_options->showSecondaryElevation);
 
+#ifdef ENABLE_TIMEZONES
+	_utcZone = new QRadioButton(tr("UTC"));
+	_systemZone = new QRadioButton(tr("System"));
+	_customZone = new QRadioButton(tr("Custom"));
+	if (_options->timeZone.type() == TimeZoneInfo::UTC)
+		_utcZone->setChecked(true);
+	else if (_options->timeZone.type() == TimeZoneInfo::System)
+		_systemZone->setChecked(true);
+	else
+		_customZone->setChecked(true);
+	_timeZone = new QComboBox();
+	_timeZone->setEnabled(_customZone->isChecked());
+	QList<QByteArray> zones = QTimeZone::availableTimeZoneIds();
+	for (int i = 0; i < zones.size(); i++)
+		_timeZone->addItem(zones.at(i));
+	_timeZone->setCurrentText(_options->timeZone.customZone().id());
+	connect(_customZone, SIGNAL(toggled(bool)), _timeZone,
+	  SLOT(setEnabled(bool)));
+	QHBoxLayout *customZoneLayout = new QHBoxLayout();
+	customZoneLayout->addSpacing(20);
+	customZoneLayout->addWidget(_timeZone);
+#endif // ENABLE_TIMEZONES
 
 	QWidget *sourceTab = new QWidget();
 	QVBoxLayout *sourceTabLayout = new QVBoxLayout();
 
 #ifdef Q_OS_MAC
+	QButtonGroup *speedGroup = new QButtonGroup(this);
+	speedGroup->addButton(_computedSpeed);
+	speedGroup->addButton(_reportedSpeed);
 	QVBoxLayout *speedOptions = new QVBoxLayout();
 	speedOptions->addWidget(_computedSpeed);
 	speedOptions->addWidget(_reportedSpeed);
+	speedOptions->addWidget(_showSecondarySpeed);
 
+	QButtonGroup *elevationGroup = new QButtonGroup(this);
+	elevationGroup->addButton(_dataGPSElevation);
+	elevationGroup->addButton(_dataDEMElevation);
 	QVBoxLayout *elevationOptions = new QVBoxLayout();
 	elevationOptions->addWidget(_dataGPSElevation);
 	elevationOptions->addWidget(_dataDEMElevation);
+	elevationOptions->addWidget(_showSecondaryElevation);
+
+#ifdef ENABLE_TIMEZONES
+	QButtonGroup *timeZoneGroup = new QButtonGroup(this);
+	timeZoneGroup->addButton(_utcZone);
+	timeZoneGroup->addButton(_systemZone);
+	timeZoneGroup->addButton(_customZone);
+	QVBoxLayout *zoneOptions = new QVBoxLayout();
+	zoneOptions->addWidget(_utcZone);
+	zoneOptions->addWidget(_systemZone);
+	zoneOptions->addWidget(_customZone);
+	zoneOptions->addItem(customZoneLayout);
+#endif // ENABLE_TIMEZONES
 
 	QFormLayout *formLayout = new QFormLayout();
 	formLayout->addRow(tr("Speed:"), speedOptions);
 	formLayout->addRow(tr("Elevation:"), elevationOptions);
+#ifdef ENABLE_TIMEZONES
+	formLayout->addRow(tr("Time zone:"), zoneOptions);
+#endif // ENABLE_TIMEZONES
 
 	sourceTabLayout->addLayout(formLayout);
 #else // Q_OS_MAC
 	QFormLayout *speedLayout = new QFormLayout();
 	QFormLayout *elevationLayout = new QFormLayout();
+#ifdef ENABLE_TIMEZONES
+	QFormLayout *timeZoneLayout = new QFormLayout();
+#endif // ENABLE_TIMEZONES
 
 	speedLayout->addWidget(_computedSpeed);
 	speedLayout->addWidget(_reportedSpeed);
+	speedLayout->addWidget(_showSecondarySpeed);
 
 	QGroupBox *speedBox = new QGroupBox(tr("Speed"));
 	speedBox->setLayout(speedLayout);
 
 	elevationLayout->addWidget(_dataGPSElevation);
 	elevationLayout->addWidget(_dataDEMElevation);
+	elevationLayout->addWidget(_showSecondaryElevation);
 
 	QGroupBox *elevationBox = new QGroupBox(tr("Elevation"));
 	elevationBox->setLayout(elevationLayout);
 
+#ifdef ENABLE_TIMEZONES
+	timeZoneLayout->addWidget(_utcZone);
+	timeZoneLayout->addWidget(_systemZone);
+	timeZoneLayout->addWidget(_customZone);
+	timeZoneLayout->addItem(customZoneLayout);
+
+	QGroupBox *timeZoneBox = new QGroupBox(tr("Time zone"));
+	timeZoneBox->setLayout(timeZoneLayout);
+#endif // ENABLE_TIMEZONES
+
 	sourceTabLayout->addWidget(speedBox);
 	sourceTabLayout->addWidget(elevationBox);
+#ifdef ENABLE_TIMEZONES
+	sourceTabLayout->addWidget(timeZoneBox);
+#endif // ENABLE_TIMEZONES
 #endif // Q_OS_MAC
 	sourceTabLayout->addStretch();
 	sourceTab->setLayout(sourceTabLayout);
@@ -465,13 +530,6 @@ QWidget *OptionsDialog::createDataPage()
 
 QWidget *OptionsDialog::createPOIPage()
 {
-	_poiGPSElevation = new QRadioButton(tr("GPS data"));
-	_poiDEMElevation = new QRadioButton(tr("DEM data"));
-	if (_options->poiUseDEM)
-		_poiDEMElevation->setChecked(true);
-	else
-		_poiGPSElevation->setChecked(true);
-
 	_poiRadius = new QDoubleSpinBox();
 	_poiRadius->setSingleStep(1);
 	_poiRadius->setDecimals(1);
@@ -486,13 +544,8 @@ QWidget *OptionsDialog::createPOIPage()
 		_poiRadius->setSuffix(UNIT_SPACE + tr("km"));
 	}
 
-	QVBoxLayout *elevationLayout = new QVBoxLayout();
-	elevationLayout->addWidget(_poiGPSElevation);
-	elevationLayout->addWidget(_poiDEMElevation);
-
 	QFormLayout *poiLayout = new QFormLayout();
 	poiLayout->addRow(tr("Radius:"), _poiRadius);
-	poiLayout->addRow(tr("Elevation:"), elevationLayout);
 
 	QWidget *poiTab = new QWidget();
 	poiTab->setLayout(poiLayout);
@@ -675,7 +728,7 @@ OptionsDialog::OptionsDialog(Options *options, QWidget *parent)
 void OptionsDialog::accept()
 {
 	_options->palette.setColor(_baseColor->color());
-	_options->palette.setShift(_colorOffset->value());
+	_options->palette.setShift(_colorOffset->value() / 100.0);
 	_options->mapOpacity = _mapOpacity->value();
 	_options->backgroundColor = _backgroundColor->color();
 	_options->trackWidth = _trackWidth->value();
@@ -718,13 +771,21 @@ void OptionsDialog::accept()
 	_options->pauseInterval = _pauseInterval->value();
 	_options->useReportedSpeed = _reportedSpeed->isChecked();
 	_options->dataUseDEM = _dataDEMElevation->isChecked();
+	_options->showSecondaryElevation = _showSecondaryElevation->isChecked();
+	_options->showSecondarySpeed = _showSecondarySpeed->isChecked();
+#ifdef ENABLE_TIMEZONES
+	_options->timeZone.setType(_utcZone->isChecked()
+	  ? TimeZoneInfo::UTC : _systemZone->isChecked()
+	  ? TimeZoneInfo::System : TimeZoneInfo::Custom);
+	_options->timeZone.setCustomZone(QTimeZone(_timeZone->currentText()
+	  .toLatin1()));
+#endif // ENABLE_TIMEZONES
 
 	qreal poiRadius = (_options->units == Imperial)
 		? _poiRadius->value() * MIINM : (_options->units == Nautical)
 		? _poiRadius->value() * NMIINM : _poiRadius->value() * KMINM;
 	if (qAbs(poiRadius - _options->poiRadius) > 0.01)
 		_options->poiRadius = poiRadius;
-	_options->poiUseDEM = _poiDEMElevation->isChecked();
 
 	_options->useOpenGL = _useOpenGL->isChecked();
 #ifdef ENABLE_HTTP2
