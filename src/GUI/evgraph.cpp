@@ -246,16 +246,23 @@ void EVGraph::showSingleEVData()
 	if (act == NULL)
 		return;
 
+	// Scalar ID to be only visible
 	int id = act->data().toInt();
-	for (int idx = 0; idx < EVData::t_scalar_num; idx++)
-		if (idx != id) {
-			QAction *a = findAction(_evShowActions, idx);
-			if (a) {
-				a->setChecked(false);
-				EVGraphItem *gi = _tracks.at(idx);
-				removeGraph(gi);
-			}
+
+	// Remove all non-matching graphs
+	for (int i = 0; i < _tracks.size(); i++) {
+		EVGraphItem *gi = _tracks.at(i);
+		if (id != gi->getScalarId()) {
+			removeGraph(gi);
 		}
+	}
+
+	// Uncheck all non-matching actions (see findAction)
+	for (int i = 0; i < _evShowActions.size(); i++) {
+		QAction *a = _evShowActions[i];
+		if (id != a->data())
+			a->setChecked(false);
+	}
 
 	redraw();
 }
